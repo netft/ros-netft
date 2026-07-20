@@ -1,0 +1,15 @@
+sensor_ip: 192.168.31.100
+sensor_port: 49152
+frame_id: netft_link
+wrench_topic: /netft/wrench
+bias_service: /netft/bias
+counts_per_force: 1000000.0
+counts_per_torque: 1000000.0
+publish_rate: 0.0
+receive_timeout: 0.1
+reconnect_initial_delay: 0.25
+reconnect_max_delay: 5.0
+diagnostics_rate: 1.0
+expected_rdt_rate: 2000.0
+rate_tolerance: 0.2
+publish_on_error: false

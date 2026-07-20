@@ -1,0 +1,102 @@
+"$schema" = "https://pixi.sh/v0.69.0/schema/manifest/schema.json"
+
+[workspace]
+name = "ros-netft"
+version = "0.1.0"
+description = "ROS 1 and ROS 2 driver for ATI Net F/T RDT sensors"
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64"]
+channel-priority = "strict"
+
+[dependencies]
+python = ">=3.8"
+pytest = ">=8,<9"
+pytest-timeout = ">=2,<3"
+
+[tasks]
+unit = "python -m pytest -m 'not hardware'"
+ros1-harness = "bash test/integration/ros1_smoke_harness_test.sh"
+ros2-harness = "bash test/integration/ros2_smoke_harness_test.sh"
+
+[feature.noetic]
+channels = ["https://prefix.dev/robostack-noetic"]
+
+[feature.noetic.dependencies]
+ros-noetic-ros-base = "*"
+catkin_tools = "*"
+cmake = "<4"
+make = "*"
+c-compiler = "*"
+cxx-compiler = "*"
+
+[feature.noetic.tasks]
+build = "bash test/integration/build_package.sh"
+smoke = "bash test/integration/ros1_smoke.sh"
+
+[feature.humble]
+channels = ["https://prefix.dev/robostack-humble"]
+
+[feature.humble.dependencies]
+ros-humble-ros-base = "*"
+ros-humble-ament-cmake-python = "*"
+colcon-common-extensions = "*"
+make = "*"
+c-compiler = "*"
+cxx-compiler = "*"
+
+[feature.humble.tasks]
+build = "bash test/integration/build_package.sh"
+smoke = "bash test/integration/ros2_smoke.sh"
+
+[feature.jazzy]
+channels = ["https://prefix.dev/robostack-jazzy"]
+
+[feature.jazzy.dependencies]
+ros-jazzy-ros-base = "*"
+ros-jazzy-ament-cmake-python = "*"
+colcon-common-extensions = "*"
+make = "*"
+c-compiler = "*"
+cxx-compiler = "*"
+
+[feature.jazzy.tasks]
+build = "bash test/integration/build_package.sh"
+smoke = "bash test/integration/ros2_smoke.sh"
+
+[feature.kilted]
+channels = ["https://prefix.dev/robostack-kilted"]
+
+[feature.kilted.dependencies]
+ros-kilted-ros-base = "*"
+ros-kilted-ament-cmake-python = "*"
+colcon-common-extensions = "*"
+make = "*"
+c-compiler = "*"
+cxx-compiler = "*"
+
+[feature.kilted.tasks]
+build = "bash test/integration/build_package.sh"
+smoke = "bash test/integration/ros2_smoke.sh"
+
+[feature.lyrical]
+channels = ["https://prefix.dev/robostack-lyrical"]
+
+[feature.lyrical.dependencies]
+ros-lyrical-ros-base = "*"
+ros-lyrical-ament-cmake-python = "*"
+colcon-common-extensions = "*"
+make = "*"
+c-compiler = "*"
+cxx-compiler = "*"
+
+[feature.lyrical.tasks]
+build = "bash test/integration/build_package.sh"
+smoke = "bash test/integration/ros2_smoke.sh"
+
+[environments]
+test = { features = [] }
+noetic = { features = ["noetic"], solve-group = "noetic" }
+humble = { features = ["humble"], solve-group = "humble" }
+jazzy = { features = ["jazzy"], solve-group = "jazzy" }
+kilted = { features = ["kilted"], solve-group = "kilted" }
+lyrical = { features = ["lyrical"], solve-group = "lyrical" }

@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  native-ros:
+    name: ROS ${{ matrix.distro }} (${{ matrix.policy }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: noetic
+            image: ros:noetic-ros-base
+            ros_version: 1
+            policy: legacy-eol-source-only
+          - distro: humble
+            image: ros:humble-ros-base
+            ros_version: 2
+            policy: compatibility
+          - distro: jazzy
+            image: ros:jazzy-ros-base
+            ros_version: 2
+            policy: primary
+          - distro: kilted
+            image: ros:kilted-ros-base
+            ros_version: 2
+            policy: active-short-lived
+          - distro: lyrical
+            image: ros:lyrical-ros-base
+            ros_version: 2
+            policy: primary
+    container:
+      image: ${{ matrix.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      ROS_DISTRO: ${{ matrix.distro }}
+      ROS_VERSION: ${{ matrix.ros_version }}
+    steps:
+      - name: Install checkout dependency
+        run: apt-get update && apt-get install -y git
+      - uses: actions/checkout@v4
+      - name: Install source dependencies
+        shell: bash
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          if [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]]; then
+            rosdep init
+          fi
+          rosdep update --rosdistro "${ROS_DISTRO}" --include-eol-distros
+          rosdep install --from-paths . --ignore-src -r -y \
+            --rosdistro "${ROS_DISTRO}"
+          apt-get install -y python3-pytest
+          if [[ "${ROS_VERSION}" == "2" ]]; then
+            apt-get install -y python3-colcon-common-extensions
+          fi
+      - name: Run pure and package tests
+        shell: bash
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          python3 -m pytest
+          bash test/integration/build_package.sh
+      - name: Run loopback graph smoke
+        shell: bash
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          if [[ "${ROS_VERSION}" == "1" ]]; then
+            bash test/integration/ros1_smoke.sh
+          else
+            bash test/integration/ros2_smoke.sh
+          fi
