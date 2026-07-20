@@ -127,6 +127,8 @@ def test_native_ci_has_the_supported_source_matrix_without_release_claims():
     assert 'rosdep update --rosdistro "${ROS_DISTRO}" --include-eol-distros' in workflow
     assert "rosdep install --from-paths . --ignore-src -r -y" in workflow
     assert "apt-get install -y python3-pytest" in workflow
+    assert "actions/checkout@v7" in workflow
+    assert "actions/checkout@v4" not in workflow
     assert "bash test/integration/ros1_smoke.sh" in workflow
     assert "bash test/integration/ros2_smoke.sh" in workflow
     assert "bloom-release" not in workflow
