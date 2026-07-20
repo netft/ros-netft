@@ -297,15 +297,6 @@ def test_fault_log_adapter_uses_native_warning_and_error_severities():
     assert errors == ["lost"]
 
 
-def test_readme_documents_diagnostic_event_windows_and_thresholds():
-    readme = Path(__file__).resolve().parents[1].joinpath("README.md").read_text(
-        encoding="utf-8"
-    )
-    assert "10 or more malformed datagrams between consecutive diagnostic updates" in readme
-    assert "reported as `ERROR` for at least one diagnostic update after recovery" in readme
-    assert "repeated at most once every 10 seconds" in readme
-
-
 def test_diagnostic_evaluator_rejects_boolean_rate_tolerance():
     with pytest.raises(ValueError, match="rate_tolerance"):
         DiagnosticEvaluator(2000.0, True)

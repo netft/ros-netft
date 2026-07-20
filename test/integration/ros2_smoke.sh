@@ -238,6 +238,7 @@ run_full_graph_scenario() {
     -p sensor_ip:=127.0.0.1 \
     -p sensor_port:="$sensor_port" \
     -p expected_rdt_rate:=200.0 \
+    -p receive_timeout:=1.0 \
     -p diagnostics_rate:=10.0 \
     >"$scenario_root/node.log" 2>&1 &
   node_pid=$!
@@ -343,6 +344,7 @@ run_shutdown_scenario() {
     -p sensor_ip:=127.0.0.1 \
     -p sensor_port:="$sensor_port" \
     -p expected_rdt_rate:=200.0 \
+    -p receive_timeout:=1.0 \
     >"$scenario_root/node.log" 2>&1 &
   node_pid=$!
 

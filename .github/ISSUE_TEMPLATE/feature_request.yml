@@ -1,0 +1,72 @@
+name: Feature request
+description: Propose an improvement to the driver
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for proposing an improvement. Describe the operator problem before the preferred implementation.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What limitation are you encountering, and who is affected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired behavior, interfaces, or workflow.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe current workarounds or other approaches you considered.
+
+  - type: dropdown
+    id: ros_distributions
+    attributes:
+      label: Affected ROS distributions
+      multiple: true
+      options:
+        - ROS 2 Lyrical
+        - ROS 2 Kilted
+        - ROS 2 Jazzy
+        - ROS 2 Humble
+        - ROS 1 Noetic
+        - Distribution-independent
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware and safety implications
+      description: State whether the proposal requires a physical sensor, changes sensor state, or affects force-control safety.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add related issues, protocol references, diagrams, or examples.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched open and closed issues for similar requests.
+          required: true
+        - label: I described the use case independently of a specific implementation.
+          required: true

@@ -1,0 +1,123 @@
+name: Bug report
+description: Report a reproducible problem with the driver
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. Search existing issues first and remove sensitive information from logs.
+
+  - type: input
+    id: driver_revision
+    attributes:
+      label: Driver revision
+      description: Provide a release tag or the output of `git rev-parse --short HEAD`.
+      placeholder: v0.1.0 or abcdef0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ros_distribution
+    attributes:
+      label: ROS distribution
+      multiple: true
+      options:
+        - ROS 2 Lyrical
+        - ROS 2 Kilted
+        - ROS 2 Jazzy
+        - ROS 2 Humble
+        - ROS 1 Noetic
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - Source build with colcon
+        - Source build with catkin
+        - Pixi development environment
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Include the operating system, version, and CPU architecture.
+      placeholder: Ubuntu 24.04, x86_64
+    validations:
+      required: true
+
+  - type: input
+    id: sensor
+    attributes:
+      label: Sensor model
+      description: Provide the product model, but omit private serial numbers.
+      placeholder: ATI Ethernet Axia
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem description
+      description: Explain what happened and how it affects the application.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest repeatable sequence, including launch commands and relevant parameters.
+      placeholder: |
+        1. Start the driver with ...
+        2. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste relevant `/diagnostics` values and state whether another RDT client was running.
+      render: shell
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste complete relevant logs after removing sensitive information.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched open and closed issues for duplicates.
+          required: true
+        - label: I removed credentials, private network details, and sensor identifiers.
+          required: true
+        - label: I stopped or identified any other RDT client when reproducing the problem.
+          required: true

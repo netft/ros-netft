@@ -9,6 +9,24 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _verbose_check_ignore_result_is_ignored(returncode, output):
+    if returncode == 1:
+        return False
+    fields = output.split(b"\0")
+    if returncode != 0 or len(fields) < 4:
+        raise ValueError("invalid git check-ignore result")
+    return not fields[2].startswith(b"!")
+
+
+def test_verbose_check_ignore_result_distinguishes_negated_patterns():
+    negated = b".gitignore\x0073\x00!.env.example\x00.env.example\x00"
+    ignored = b".gitignore\x0072\x00.env.*\x00.env.local\x00"
+
+    assert not _verbose_check_ignore_result_is_ignored(0, negated)
+    assert _verbose_check_ignore_result_is_ignored(0, ignored)
+    assert not _verbose_check_ignore_result_is_ignored(1, b"")
+
+
 def make_git_environment(home, xdg_config, template):
     env = {
         key: value for key, value in os.environ.items() if not key.startswith("GIT_")
@@ -56,19 +74,30 @@ def make_policy_checker(base_path):
 
     def check(path):
         result = subprocess.run(
-            ["git", "check-ignore", "--no-index", "--quiet", "--", path],
+            [
+                "git",
+                "check-ignore",
+                "--no-index",
+                "--verbose",
+                "-z",
+                "--stdin",
+            ],
             cwd=str(repo),
+            input=path.encode("utf-8") + b"\0",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            universal_newlines=True,
             env=environment,
             check=False,
         )
         if result.returncode not in (0, 1):
             pytest.fail(
-                "git check-ignore failed for {!r}: {}".format(path, result.stderr)
+                "git check-ignore failed for {!r}: {}".format(
+                    path, result.stderr.decode("utf-8", errors="replace")
+                )
             )
-        return result.returncode == 0
+        return _verbose_check_ignore_result_is_ignored(
+            result.returncode, result.stdout
+        )
 
     return check
 

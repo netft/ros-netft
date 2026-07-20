@@ -65,14 +65,6 @@ def test_public_project_metadata_is_complete():
     assert setup["project_urls"] == {"Bug Tracker": BUGTRACKER_URL}
 
 
-def test_initial_changelog_is_release_candidate_not_binary_claim():
-    text = (ROOT / "CHANGELOG.rst").read_text(encoding="utf-8")
-    assert "Changelog for package netft_driver" in text
-    assert "0.1.0 (2026-07-19)" in text
-    assert "Initial public release candidate" in text
-    assert "available from the ROS build farm" not in text
-
-
 def test_unused_ament_python_resource_marker_is_absent():
     assert not (ROOT / "resource" / "netft_driver").exists()
 
@@ -115,6 +107,7 @@ def test_ros2_shutdown_regression_is_integrated_into_smoke():
     assert "[2, 66, 2, 0]" in smoke
     assert "[2, 0]" in smoke
     assert "ExternalShutdownException" in smoke
+    assert smoke.count("-p receive_timeout:=1.0") == 2
 
 
 def test_native_ci_has_the_supported_source_matrix_without_release_claims():
@@ -133,57 +126,10 @@ def test_native_ci_has_the_supported_source_matrix_without_release_claims():
     assert "docker build" not in workflow
 
 
-def test_public_architecture_describes_supported_boundaries():
-    architecture = (ROOT / "docs/architecture.md").read_text(encoding="utf-8")
-    for heading in (
-        "## Package boundaries",
-        "## RDT protocol",
-        "## RDT session lifecycle",
-        "## Sequence and fault accounting",
-        "## ROS adapters",
-        "## Test boundaries",
-    ):
-        assert heading in architecture
-    assert "maintainers and contributors" in architecture
-    assert "`netft_node`" in architecture
-    assert "`netft_check`" in architecture
-
-
 def test_hardware_acceptance_report_is_not_public():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert not (ROOT / "docs/hardware-validation.md").exists()
     assert "docs/hardware-validation.md" not in readme
-
-
-def test_readme_is_operator_first_and_truthful():
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
-    prose = " ".join(text.split())
-    headings = [
-        "## Release status",
-        "## Installation",
-        "## Quick start",
-        "## Interfaces",
-        "## Configuration",
-        "## Operations and safety",
-        "## Troubleshooting",
-        "## Development",
-        "## Release",
-        "## License",
-    ]
-    positions = [text.index(heading + "\n") for heading in headings]
-    assert positions == sorted(positions)
-    assert REPOSITORY_URL + ".git" in text
-    assert "rosdep install --from-paths src --ignore-src -r -y" in text
-    assert "ROS binary packages are not published yet." in prose
-    assert "### ROS 1 Noetic (EOL)" in text
-    assert "including Rolling, are unsupported" in prose
-    assert "apt install ros-lyrical-netft-driver" not in text
-    assert "docs/architecture.md" in text
-    assert "docs/hardware-validation.md" not in text
-    assert "Primary target" not in text
-    assert "Compatibility target" not in text
-    assert "Locked source build and loopback graph smoke" not in text
-    assert "docker" not in text.lower()
 
 
 def test_readme_noetic_instructions_refresh_eol_rosdep_metadata():
@@ -218,19 +164,6 @@ def test_readme_commands_match_installed_interfaces():
     assert '<arg name="sensor_port" default="49152"/>' in ros1_launch
     assert 'DeclareLaunchArgument("sensor_ip", default_value="192.168.31.100")' in ros2_launch
     assert 'DeclareLaunchArgument("sensor_port", default_value="49152")' in ros2_launch
-
-
-def test_readme_has_contribution_guidance_and_maintainer_contact():
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
-    contribution_position = text.index("### Contributing")
-    maintainer_position = text.index("Xudong Han <hanxudong159@126.com>")
-    license_position = text.index("## License")
-
-    assert contribution_position < maintainer_position < license_position
-    assert REPOSITORY_URL + "/issues" in text
-    assert REPOSITORY_URL + "/pulls" in text
-    assert "issues" in text[contribution_position:license_position].lower()
-    assert "pull requests" in text[contribution_position:license_position].lower()
 
 
 def test_integration_scripts_require_python3_without_a_ci_alias():

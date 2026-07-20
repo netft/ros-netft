@@ -1,19 +1,21 @@
 # ROS Net F/T Driver
 
+[![CI](https://github.com/han-xudong/ros-netft/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/han-xudong/ros-netft/actions/workflows/ci.yml)
+[![ROS](https://img.shields.io/badge/ROS-1%20%7C%202-22314E.svg?logo=ros&logoColor=white)](https://www.ros.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 `netft_driver` publishes `geometry_msgs/WrenchStamped` force and torque data
 from ATI Ethernet Net F/T and Ethernet Axia sensors through the UDP Raw Data
 Transfer (RDT) protocol. One ROS-neutral transport core serves native ROS 1 and
 ROS 2 adapters.
 
-- Continuous RDT streaming with timeout recovery and bounded reconnect backoff
-- Sequence, rate, device-status, and connection diagnostics
-- Serious-status publication filtering, with an explicit opt-in override
-- Explicit software-bias service that restarts streaming after the command
-- Bounded, non-biasing `netft_check` command for operator verification
+- Resilient RDT streaming with timeout recovery and bounded reconnect backoff
+- Connection, sequence, rate, and device-status diagnostics with serious-sample
+  filtering
+- Explicit software bias and a bounded, non-biasing `netft_check` operator tool
 
 ## Release status
 
-Version `0.1.0` is a source release candidate.
 ROS binary packages are not published yet.
 
 | ROS distribution | Branch | Source support | Binary packages |
@@ -22,16 +24,9 @@ ROS binary packages are not published yet.
 | ROS 2 Kilted | `main` | Supported | Not released |
 | ROS 2 Jazzy | `main` | Supported | Not released |
 | ROS 2 Humble | `main` | Supported | Not released |
+| ROS 1 Noetic* | `main` | Legacy | Not released |
 
-The table describes declared source-build targets. Public CI and ROS build-farm
-results will be linked when they exist. Other distributions, including Rolling,
-are unsupported until they have a locked environment and native CI job.
-
-### ROS 1 Noetic (EOL)
-
-Noetic support is a legacy, source-only compatibility path on `main`. No new
-ROS 1 build-farm release is planned; migrate to a supported ROS 2 distribution
-when possible.
+\* *ROS 1 Noetic is end-of-life and supported from source only.*
 
 ## Installation
 
@@ -50,9 +45,8 @@ source install/setup.bash
 
 ### ROS 1 Noetic legacy source installation
 
-Noetic is end-of-life. This repository keeps a legacy source-build path but
-does not promise a new official ROS 1 build-farm release. Refresh rosdep with
-EOL distribution metadata enabled before resolving dependencies.
+Noetic is end-of-life and supported from source only. Refresh rosdep with EOL
+distribution metadata enabled before resolving dependencies.
 
 ```bash
 source /opt/ros/noetic/setup.bash
@@ -237,17 +231,11 @@ pixi run -e lyrical smoke
 
 See [Architecture](docs/architecture.md) for package and lifecycle boundaries.
 
-### Contributing
+## Contributing
 
-After the canonical upstream is created, use its [issue tracker](https://github.com/han-xudong/ros-netft/issues)
-for reproducible problems and submit focused [pull requests](https://github.com/han-xudong/ros-netft/pulls)
-for proposed changes. Maintainer: Xudong Han <hanxudong159@126.com>.
-
-## Release
-
-The canonical upstream is <https://github.com/han-xudong/ros-netft>.
-Version `0.1.0` is a release candidate. No source tag, release repository,
-bloom tracks, rosdistro entries, or build-farm jobs exist yet.
+Contributions are welcome. Read the [contributing guide](CONTRIBUTING.md) before
+opening an [issue](https://github.com/han-xudong/ros-netft/issues) or submitting
+a [pull request](https://github.com/han-xudong/ros-netft/pulls).
 
 ## License
 
