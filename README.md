@@ -24,6 +24,7 @@ ROS binary packages are not published yet.
 | ROS 2 Kilted | `main` | Supported | Not released |
 | ROS 2 Jazzy | `main` | Supported | Not released |
 | ROS 2 Humble | `main` | Supported | Not released |
+| ROS 2 Rolling | `main` | Supported | Not released |
 | ROS 1 Noetic* | `main` | Legacy | Not released |
 
 \* *ROS 1 Noetic is end-of-life and supported from source only.*

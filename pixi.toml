@@ -93,6 +93,21 @@ cxx-compiler = "*"
 build = "bash test/integration/build_package.sh"
 smoke = "bash test/integration/ros2_smoke.sh"
 
+[feature.rolling]
+channels = ["https://prefix.dev/robostack-rolling"]
+
+[feature.rolling.dependencies]
+ros-rolling-ros-base = "*"
+ros-rolling-ament-cmake-python = "*"
+colcon-common-extensions = "*"
+make = "*"
+c-compiler = "*"
+cxx-compiler = "*"
+
+[feature.rolling.tasks]
+build = "bash test/integration/build_package.sh"
+smoke = "bash test/integration/ros2_smoke.sh"
+
 [environments]
 test = { features = [] }
 noetic = { features = ["noetic"], solve-group = "noetic" }
@@ -100,3 +115,4 @@ humble = { features = ["humble"], solve-group = "humble" }
 jazzy = { features = ["jazzy"], solve-group = "jazzy" }
 kilted = { features = ["kilted"], solve-group = "kilted" }
 lyrical = { features = ["lyrical"], solve-group = "lyrical" }
+rolling = { features = ["rolling"], solve-group = "rolling" }

@@ -35,9 +35,9 @@ pixi run -e jazzy build
 pixi run -e jazzy smoke
 ```
 
-The available Pixi environments are `noetic`, `humble`, `jazzy`, `kilted`, and
-`lyrical`. Native ROS installations may also be used; CI runs the complete
-supported source matrix.
+The available Pixi environments are `noetic`, `humble`, `jazzy`, `kilted`,
+`lyrical`, and `rolling`. Native ROS installations may also be used; CI runs
+the complete supported source matrix.
 
 ## Pull requests
 

@@ -112,11 +112,18 @@ def test_ros2_shutdown_regression_is_integrated_into_smoke():
 
 def test_native_ci_has_the_supported_source_matrix_without_release_claims():
     workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    for distro in ("noetic", "humble", "jazzy", "kilted", "lyrical"):
+    for distro in (
+        "noetic",
+        "humble",
+        "jazzy",
+        "kilted",
+        "lyrical",
+        "rolling",
+    ):
         assert "distro: " + distro in workflow
         assert "ros:" + distro + "-ros-base" in workflow
     assert "policy: legacy-eol-source-only" in workflow
-    assert "distro: rolling" not in workflow
+    assert "policy: development" in workflow
     assert 'rosdep update --rosdistro "${ROS_DISTRO}" --include-eol-distros' in workflow
     assert "rosdep install --from-paths . --ignore-src -r -y" in workflow
     assert "apt-get install -y python3-pytest" in workflow
