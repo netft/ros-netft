@@ -171,6 +171,47 @@ set -e
 [[ "$stop_status" -eq 1 ]]
 grep -Fxq 'failed to stop ROS 2 daemon for domain 220' <<<"$stop_output"
 
+zombie_output="$(bash -c '
+  source "$1"
+  isolation_shutdown_poll_attempts=5
+  isolation_shutdown_poll_interval=0.02
+  child_file="$2"
+  parent_pid=""
+  cleanup_fixture() {
+    if [[ -n "$parent_pid" ]]; then
+      kill -KILL "$parent_pid" 2>/dev/null || true
+      wait "$parent_pid" 2>/dev/null || true
+    fi
+  }
+  trap cleanup_fixture EXIT
+  python3 -c "
+import os
+import pathlib
+import sys
+import time
+child = os.fork()
+if child == 0:
+    os.setsid()
+    os._exit(0)
+pathlib.Path(sys.argv[1]).write_text(str(child), encoding=\"utf-8\")
+time.sleep(300)
+" "$child_file" &
+  parent_pid="$!"
+  deadline=$((SECONDS + 5))
+  while [[ ! -s "$child_file" ]]; do
+    ((SECONDS < deadline)) || exit 1
+    sleep 0.02
+  done
+  child_pid="$(<"$child_file")"
+  while [[ "$(process_state "$child_pid" 2>/dev/null)" != Z ]]; do
+    ((SECONDS < deadline)) || exit 1
+    sleep 0.02
+  done
+  terminate_active_pid "$child_pid"
+  echo "zombie-only process group treated as stopped"
+' _ "$isolation_script" "$test_root/zombie.child")"
+grep -Fxq 'zombie-only process group treated as stopped' <<<"$zombie_output"
+
 isolation_output="$(bash -c '
   source "$1"
   isolation_shutdown_poll_attempts=5
