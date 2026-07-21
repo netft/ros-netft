@@ -66,6 +66,20 @@ def _run_validator(tmp_path, target, expectation, files):
             ["passed"],
             1,
         ),
+        (
+            "netft_ros1_node",
+            "at-least-one",
+            "catkin/netft_driver/gtest-netft_ros1_node.xml",
+            ["passed", "passed"],
+            2,
+        ),
+        (
+            "netft_hardware_interface",
+            "at-least-one",
+            "ament/netft_driver/netft_hardware_interface.gtest.xml",
+            ["passed", "passed", "passed"],
+            3,
+        ),
     ],
 )
 def test_validator_accepts_expected_non_skipped_counts(

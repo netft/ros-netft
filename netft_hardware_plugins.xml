@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<library path="netft_ros2_control">
+  <class
+    name="netft_driver/NetFTHardwareInterface"
+    type="netft_driver::NetFTHardwareInterface"
+    base_class_type="hardware_interface::SensorInterface">
+    <description>Fail-stop ATI Net F/T RDT ros2_control sensor interface.</description>
+  </class>
+</library>

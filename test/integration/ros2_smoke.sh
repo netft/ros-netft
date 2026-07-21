@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "$repo_root/test/integration/ros2_domain_lease.sh"
+
 shutdown_poll_attempts=20
 shutdown_poll_interval=0.05
 reaped_pid=""
@@ -144,10 +147,6 @@ shutdown_process_group() {
   fi
 }
 
-stop_ros2_daemon() {
-  timeout --kill-after=2s 5s ros2 daemon stop >/dev/null 2>&1 || true
-}
-
 validate_command_history() {
   python3 - "$1" "$2" <<'PY'
 import json
@@ -178,14 +177,22 @@ cleanup() {
   if ! shutdown_child "${sensor_pid:-}" INT; then
     cleanup_failed=1
   fi
-  stop_ros2_daemon
+  local domain
+  for domain in "${NETFT_ROS2_LEASED_DOMAINS[@]}"; do
+    if ! stop_ros2_daemon_for_domain "$domain"; then
+      cleanup_failed=1
+    fi
+  done
+  if ! release_ros2_domain_leases; then
+    cleanup_failed=1
+  fi
   if [[ -n "${temp_root:-}" ]]; then
     if ! rm -rf -- "$temp_root"; then
       cleanup_failed=1
     fi
   fi
   if (( cleanup_failed != 0 )); then
-    echo "ROS 2 smoke cleanup did not stop every managed process" >&2
+    echo "ROS 2 smoke cleanup failed" >&2
     if (( status == 0 )); then
       status=1
     fi
@@ -200,17 +207,26 @@ prepare_workspace() {
   timeout --kill-after=30s 180s colcon build \
     --base-paths src \
     --packages-select netft_driver \
+    --cmake-args -DNETFT_INSTALL_TEST_TOOLS=ON \
     --event-handlers console_direct+ >/dev/null
   set +u
   source install/setup.bash
   set -u
+  ros2 pkg executables netft_driver >"$temp_root/executables.txt"
+  grep -Fxq 'netft_driver netft_node' "$temp_root/executables.txt"
+  grep -Fxq 'netft_driver netft_check' "$temp_root/executables.txt"
+  test -x "$temp_root/ws/install/netft_driver/lib/netft_driver/netft_node"
+  test -x "$temp_root/ws/install/netft_driver/lib/netft_driver/netft_check"
+  installed_probe="$temp_root/ws/install/netft_driver/share/netft_driver/test/integration/ros2_graph_probe.py"
+  test -x "$installed_probe"
+  ! find "$temp_root/ws/install/netft_driver" -type d -path '*/site-packages/netft_driver' -print -quit | grep -q .
+  ros2 run netft_driver netft_check --help >/dev/null
 }
 
 run_full_graph_scenario() {
   local scenario_root="$1"
   local domain="$2"
   local sensor_port
-  local service_type
   local group_id
   local node_status
 
@@ -234,51 +250,57 @@ run_full_graph_scenario() {
   fi
   sensor_port="$(<"$scenario_root/sensor.port")"
 
-  setsid ros2 run netft_driver netft_node --ros-args \
+  setsid ros2 run netft_driver netft_node --ros-args -r __ns:=/netft_smoke -r wrench:=remapped_wrench \
     -p sensor_ip:=127.0.0.1 \
     -p sensor_port:="$sensor_port" \
+    -p frame_id:=smoke_frame -p wrench_topic:=wrench -p bias_service:=bias \
+    -p counts_per_force:=2000000.0 -p counts_per_torque:=4000000.0 -p publish_rate:=50.0 \
     -p expected_rdt_rate:=200.0 \
-    -p receive_timeout:=1.0 \
-    -p diagnostics_rate:=10.0 \
+    -p receive_timeout:=0.8 -p reconnect_initial_delay:=0.11 -p reconnect_max_delay:=0.37 \
+    -p diagnostics_rate:=5.0 -p rate_tolerance:=0.35 -p publish_on_error:=true \
     >"$scenario_root/node.log" 2>&1 &
   node_pid=$!
 
-  for _ in $(seq 1 100); do
-    if timeout --kill-after=1s 3s ros2 service type /netft/bias \
-      >/dev/null 2>&1; then
-      break
-    fi
-    kill -0 "$node_pid" 2>/dev/null || break
-    sleep 0.05
-  done
+  if ! timeout --kill-after=2s 20s python3 "$installed_probe" full \
+    --node-name /netft_smoke/netft \
+    --service-name /netft_smoke/bias \
+    --wrench-topic /netft_smoke/remapped_wrench \
+    --absent-topic /netft_smoke/wrench \
+    --diagnostics-topic /diagnostics \
+    --wrench-output "$scenario_root/wrench.txt" \
+    --diagnostics-output "$scenario_root/diagnostics.txt" \
+    --post-bias-output "$scenario_root/post_bias.txt" \
+    --bias-output "$scenario_root/bias.txt" \
+    --timeout 15 >"$scenario_root/probe.log" 2>&1; then
+    cat "$scenario_root/probe.log" >&2
+    cat "$scenario_root/node.log" >&2
+    return 1
+  fi
   if ! kill -0 "$node_pid" 2>/dev/null; then
     cat "$scenario_root/node.log" >&2
     return 1
   fi
-  service_type="$(
-    timeout --kill-after=1s 3s ros2 service type /netft/bias
-  )"
-  test "$service_type" = "std_srvs/srv/Trigger"
 
-  timeout --kill-after=2s 10s ros2 topic echo --once /netft/wrench \
-    >"$scenario_root/wrench.txt"
-  assert_file_contains 'frame_id: netft_link' "$scenario_root/wrench.txt"
-  assert_file_contains 'x: 0.0001' "$scenario_root/wrench.txt"
+  python3 "$repo_root/test/integration/ros_graph_assertions.py" wrench \
+    "$scenario_root/wrench.txt" --ros-version 2 --frame-id smoke_frame \
+    --axes 0.00005 -0.0001 0.00015 0.0000025 -0.000005 0.0000075
+  python3 "$repo_root/test/integration/ros_graph_assertions.py" wrench \
+    "$scenario_root/post_bias.txt" --ros-version 2 --frame-id smoke_frame \
+    --axes 0.0 0.0 0.0 0.0 0.0 0.0
 
-  timeout --kill-after=2s 10s ros2 topic echo --once /diagnostics \
-    >"$scenario_root/diagnostics.txt"
   assert_file_contains 'netft_driver: connection' \
     "$scenario_root/diagnostics.txt"
-  assert_file_contains 'hardware_id: 127.0.0.1:' \
+  assert_file_contains "hardware_id: \"127.0.0.1:$sensor_port\"" \
     "$scenario_root/diagnostics.txt"
-  assert_file_contains 'level: "\\0"' "$scenario_root/diagnostics.txt"
+  python3 "$repo_root/test/integration/ros_graph_assertions.py" diagnostics \
+    "$scenario_root/diagnostics.txt" --ros-version 2 \
+    --status-header "$repo_root/include/netft_driver/status.hpp" \
+    --expected-rate 5.0 --configured-publish-rate 50.0 \
+    --expected-value "sensor=127.0.0.1:$sensor_port" \
+    --expected-value expected_receive_rate_hz=200.0 \
+    --expected-value rate_tolerance=0.350
 
-  timeout --kill-after=2s 10s \
-    ros2 service call /netft/bias std_srvs/srv/Trigger '{}' \
-    >"$scenario_root/bias.txt"
   assert_file_contains 'success=True' "$scenario_root/bias.txt"
-  timeout --kill-after=2s 10s ros2 topic echo --once /netft/wrench \
-    >"$scenario_root/post_bias.txt"
 
   group_id="$node_pid"
   set +e
@@ -304,7 +326,6 @@ run_full_graph_scenario() {
 
   shutdown_child "$sensor_pid" TERM
   sensor_pid=""
-  stop_ros2_daemon
   validate_command_history "$scenario_root/commands.json" '[2, 66, 2, 0]'
   echo "ROS 2 full graph scenario passed: exit 0, commands [2, 66, 2, 0]"
 }
@@ -313,7 +334,6 @@ run_shutdown_scenario() {
   local scenario_root="$1"
   local domain="$2"
   local sensor_port
-  local service_ready=0
   local group_id
   local leader_stopped=0
   local group_stopped=0
@@ -348,22 +368,19 @@ run_shutdown_scenario() {
     >"$scenario_root/node.log" 2>&1 &
   node_pid=$!
 
-  for _ in $(seq 1 100); do
-    if timeout --kill-after=1s 3s ros2 service type /netft/bias \
-      >/dev/null 2>&1; then
-      service_ready=1
-      break
-    fi
-    kill -0 "$node_pid" 2>/dev/null || break
-    sleep 0.05
-  done
-  if [[ "$service_ready" -ne 1 ]]; then
+  if ! timeout --kill-after=2s 20s python3 "$installed_probe" ready \
+    --node-name /netft \
+    --service-name /netft/bias \
+    --wrench-topic /netft/wrench \
+    --wrench-output "$scenario_root/wrench.txt" \
+    --timeout 15 >"$scenario_root/probe.log" 2>&1; then
+    cat "$scenario_root/probe.log" >&2
     cat "$scenario_root/node.log" >&2
     return 1
   fi
-  timeout --kill-after=2s 10s ros2 topic echo --once /netft/wrench \
-    >"$scenario_root/wrench.txt"
-  assert_file_contains 'frame_id: netft_link' "$scenario_root/wrench.txt"
+  python3 "$repo_root/test/integration/ros_graph_assertions.py" wrench \
+    "$scenario_root/wrench.txt" --ros-version 2 --frame-id netft_link \
+    --axes 0.0001 -0.0002 0.0003 0.00001 -0.00002 0.00003
 
   group_id="$node_pid"
   kill -INT -- "-$group_id"
@@ -413,7 +430,6 @@ run_shutdown_scenario() {
 
   shutdown_child "$sensor_pid" TERM
   sensor_pid=""
-  stop_ros2_daemon
   validate_command_history "$scenario_root/commands.json" '[2, 0]'
   if grep -q 'ExternalShutdownException' "$scenario_root/node.log"; then
     cat "$scenario_root/node.log" >&2
@@ -429,16 +445,18 @@ run_shutdown_scenario() {
 }
 
 main() {
-  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-  base_domain="$((100 + $$ % 40))"
-  full_domain="$base_domain"
-  shutdown_domain="$((base_domain + 50))"
-  export ROS_DOMAIN_ID="$full_domain"
+  full_domain=""
+  shutdown_domain=""
   export ROS_LOCALHOST_ONLY=1
-  temp_root="$(mktemp -d)"
+  temp_root=""
   sensor_pid=""
   node_pid=""
   trap cleanup EXIT
+
+  acquire_ros2_domain full_domain
+  acquire_ros2_domain shutdown_domain
+  export ROS_DOMAIN_ID="$full_domain"
+  temp_root="$(mktemp -d)"
 
   prepare_workspace
 

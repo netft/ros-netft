@@ -2,8 +2,8 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>netft_driver</name>
-  <version>0.1.0</version>
-  <description>ROS 1 and ROS 2 driver for ATI Net F/T RDT sensors.</description>
+  <version>0.2.0</version>
+  <description>Native ROS 1, ROS 2, and ros2_control driver for ATI Net F/T RDT sensors.</description>
   <maintainer email="hanxudong159@126.com">Xudong Han</maintainer>
   <license>MIT</license>
   <url type="website">https://github.com/han-xudong/ros-netft</url>
@@ -13,20 +13,39 @@
 
   <buildtool_depend condition="$ROS_VERSION == 1">catkin</buildtool_depend>
   <buildtool_depend condition="$ROS_VERSION == 2">ament_cmake</buildtool_depend>
-  <build_depend condition="$ROS_VERSION == 2">ament_cmake_python</build_depend>
+  <build_depend condition="$ROS_VERSION == 1">roscpp</build_depend>
+  <build_depend condition="$ROS_VERSION == 2">rclcpp</build_depend>
+  <build_depend condition="$ROS_VERSION == 2">hardware_interface</build_depend>
+  <build_depend condition="$ROS_VERSION == 2">pluginlib</build_depend>
+  <build_depend condition="$ROS_VERSION == 2">realtime_tools</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
+  <build_depend>diagnostic_msgs</build_depend>
 
-  <exec_depend condition="$ROS_VERSION == 1">rospy</exec_depend>
   <exec_depend condition="$ROS_VERSION == 1">roslaunch</exec_depend>
-  <exec_depend condition="$ROS_VERSION == 2">rclpy</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 1">roscpp</exec_depend>
   <exec_depend condition="$ROS_VERSION == 2">ament_index_python</exec_depend>
   <exec_depend condition="$ROS_VERSION == 2">launch</exec_depend>
   <exec_depend condition="$ROS_VERSION == 2">launch_ros</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">rclcpp</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">hardware_interface</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">pluginlib</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">realtime_tools</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">xacro</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">force_torque_sensor_broadcaster</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">robot_state_publisher</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">controller_manager</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>
   <exec_depend>diagnostic_msgs</exec_depend>
 
   <test_depend>python3-pytest</test_depend>
+  <test_depend>gtest</test_depend>
   <test_depend condition="$ROS_VERSION == 2">ament_cmake_pytest</test_depend>
+  <test_depend condition="$ROS_VERSION == 2">ament_cmake_gtest</test_depend>
+  <test_depend condition="$ROS_VERSION == 2">rclpy</test_depend>
+  <test_depend condition="$ROS_VERSION == 2">controller_manager</test_depend>
+  <test_depend condition="$ROS_VERSION == 2">ros2controlcli</test_depend>
 
   <export>
     <build_type condition="$ROS_VERSION == 1">catkin</build_type>

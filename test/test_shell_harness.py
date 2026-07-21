@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 HARNESSES = {
     "ros1": ROOT / "test/integration/ros1_smoke_harness_test.sh",
     "ros2": ROOT / "test/integration/ros2_smoke_harness_test.sh",
+    "ros2-domain-lease": ROOT / "test/integration/ros2_domain_lease_harness_test.sh",
+    "ros2-control-cleanup": ROOT / "test/integration/ros2_control_cleanup_harness_test.sh",
 }
 
 

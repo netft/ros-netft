@@ -1,10 +1,41 @@
 cmake_minimum_required(VERSION 3.10)
 project(netft_driver)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+option(NETFT_CORE_ONLY "Build only the ROS-neutral C++ core" OFF)
+option(NETFT_INSTALL_TEST_TOOLS "Install private integration-test tools" OFF)
+
+add_library(netft_core STATIC src/protocol.cpp src/status.cpp src/client.cpp)
+set_target_properties(netft_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(netft_core PUBLIC cxx_std_17)
+target_include_directories(netft_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
+add_executable(netft_check src/check_main.cpp)
+find_package(Threads REQUIRED)
+target_link_libraries(netft_check PRIVATE netft_core Threads::Threads)
+
+if(NETFT_CORE_ONLY)
+  enable_testing()
+  find_package(GTest REQUIRED)
+  add_subdirectory(test/cpp)
+  return()
+endif()
+
 if("$ENV{ROS_VERSION}" STREQUAL "1")
-  find_package(catkin REQUIRED)
-  catkin_python_setup()
-  catkin_package()
+  find_package(catkin REQUIRED COMPONENTS roscpp geometry_msgs std_srvs diagnostic_msgs)
+  catkin_package(
+    INCLUDE_DIRS include
+    LIBRARIES netft_core
+    CATKIN_DEPENDS roscpp geometry_msgs std_srvs diagnostic_msgs)
+  add_executable(netft_node_cpp src/ros1_node.cpp)
+  set_target_properties(netft_node_cpp PROPERTIES OUTPUT_NAME netft_node)
+  target_link_libraries(netft_node_cpp PRIVATE netft_core ${catkin_LIBRARIES})
+  target_include_directories(netft_node_cpp PRIVATE ${catkin_INCLUDE_DIRS})
   if(CATKIN_ENABLE_TESTING)
     catkin_run_tests_target(
       pytest netft_unit "pytest-netft_unit.xml"
@@ -25,28 +56,127 @@ if("$ENV{ROS_VERSION}" STREQUAL "1")
     FILES config/netft_ros1.yaml
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
   )
-  catkin_install_python(
-    PROGRAMS scripts/netft_node scripts/netft_check
-    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-  )
+  install(TARGETS netft_core ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
+  install(TARGETS netft_node_cpp netft_check
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+  install(DIRECTORY include/${PROJECT_NAME}/
+    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
+  if(CATKIN_ENABLE_TESTING)
+    catkin_add_gtest(netft_ros1_node test/cpp/test_ros1_node.cpp)
+    if(TARGET netft_ros1_node)
+      target_link_libraries(netft_ros1_node netft_core ${catkin_LIBRARIES})
+      target_include_directories(netft_ros1_node PRIVATE ${catkin_INCLUDE_DIRS})
+    endif()
+  endif()
 elseif("$ENV{ROS_VERSION}" STREQUAL "2")
   find_package(ament_cmake REQUIRED)
-  find_package(ament_cmake_python REQUIRED)
-  ament_python_install_package(${PROJECT_NAME})
-  install(
-    PROGRAMS scripts/netft_node scripts/netft_check
-    DESTINATION lib/${PROJECT_NAME}
+  find_package(rclcpp REQUIRED)
+  find_package(geometry_msgs REQUIRED)
+  find_package(std_srvs REQUIRED)
+  find_package(diagnostic_msgs REQUIRED)
+  find_package(hardware_interface REQUIRED)
+  find_package(pluginlib REQUIRED)
+  find_package(realtime_tools REQUIRED)
+  if(hardware_interface_VERSION VERSION_LESS "4.0.0")
+    set(NETFT_ROS2_CONTROL_API_DEFINITION NETFT_ROS2_CONTROL_LEGACY_API)
+  else()
+    set(NETFT_ROS2_CONTROL_API_DEFINITION NETFT_ROS2_CONTROL_MODERN_API)
+  endif()
+  add_library(netft_ros2_control SHARED src/netft_hardware_interface.cpp)
+  target_compile_definitions(netft_ros2_control PRIVATE
+    ${NETFT_ROS2_CONTROL_API_DEFINITION})
+  target_include_directories(netft_ros2_control PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+  target_link_libraries(netft_ros2_control PRIVATE
+    netft_core
+    ${hardware_interface_TARGETS}
+    ${pluginlib_TARGETS}
+    ${rclcpp_TARGETS}
+    ${realtime_tools_TARGETS}
+    ${std_srvs_TARGETS}
+    ${diagnostic_msgs_TARGETS}
+  )
+  pluginlib_export_plugin_description_file(
+    hardware_interface netft_hardware_plugins.xml)
+  add_executable(netft_node_cpp src/ros2_node.cpp)
+  set_target_properties(netft_node_cpp PROPERTIES OUTPUT_NAME netft_node)
+  target_link_libraries(netft_node_cpp PRIVATE
+    netft_core
+    ${rclcpp_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${std_srvs_TARGETS}
+    ${diagnostic_msgs_TARGETS}
   )
   install(
-    FILES launch/netft.launch.py
+    FILES launch/netft.launch.py launch/netft_ros2_control.launch.py
     DESTINATION share/${PROJECT_NAME}/launch
   )
   install(
-    FILES config/netft_ros2.yaml
+    FILES config/netft_ros2.yaml config/netft_ros2_control.yaml
     DESTINATION share/${PROJECT_NAME}/config
   )
+  install(
+    FILES urdf/netft.ros2_control.xacro
+    DESTINATION share/${PROJECT_NAME}/urdf
+  )
+  if(NETFT_INSTALL_TEST_TOOLS)
+    install(
+      PROGRAMS test/integration/ros2_control_smoke.sh
+      DESTINATION share/${PROJECT_NAME}/test/integration
+    )
+    install(
+      FILES test/integration/ros2_domain_lease.sh
+      DESTINATION share/${PROJECT_NAME}/test/integration
+    )
+    install(
+      PROGRAMS test/integration/ros2_graph_probe.py
+      DESTINATION share/${PROJECT_NAME}/test/integration
+    )
+    install(
+      FILES test/integration/fake_sensor_process.py
+      DESTINATION share/${PROJECT_NAME}/test/integration
+    )
+    install(
+      FILES test/__init__.py
+      DESTINATION share/${PROJECT_NAME}/test
+    )
+    install(
+      FILES test/support/__init__.py test/support/fake_sensor.py
+      DESTINATION share/${PROJECT_NAME}/test/support
+    )
+  endif()
   if(BUILD_TESTING)
+    target_compile_definitions(netft_ros2_control PRIVATE
+      NETFT_ROS2_CONTROL_TESTING)
     find_package(ament_cmake_pytest REQUIRED)
+    find_package(ament_cmake_gtest REQUIRED)
+    ament_add_gtest(netft_ros2_node test/cpp/test_ros2_node.cpp)
+    if(TARGET netft_ros2_node)
+      target_link_libraries(netft_ros2_node
+        netft_core
+        ${rclcpp_TARGETS}
+        ${geometry_msgs_TARGETS}
+        ${std_srvs_TARGETS}
+        ${diagnostic_msgs_TARGETS}
+      )
+    endif()
+    ament_add_gtest(netft_hardware_interface
+      test/cpp/test_hardware_interface.cpp
+      test/cpp/support/fake_sensor.cpp
+    )
+    if(TARGET netft_hardware_interface)
+      target_compile_definitions(netft_hardware_interface PRIVATE
+        ${NETFT_ROS2_CONTROL_API_DEFINITION}
+        NETFT_ROS2_CONTROL_TESTING)
+      target_link_libraries(netft_hardware_interface
+        netft_ros2_control
+        netft_core
+        ${hardware_interface_TARGETS}
+        ${rclcpp_TARGETS}
+        ${std_srvs_TARGETS}
+        ${diagnostic_msgs_TARGETS}
+      )
+    endif()
     ament_add_pytest_test(netft_unit test
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
@@ -58,7 +188,26 @@ elseif("$ENV{ROS_VERSION}" STREQUAL "2")
       ENV NETFT_HARNESS=ros2
       TIMEOUT 90
     )
+    ament_add_pytest_test(netft_ros2_domain_lease_harness test/test_shell_harness.py
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+      ENV NETFT_HARNESS=ros2-domain-lease
+      TIMEOUT 30
+    )
+    ament_add_pytest_test(netft_ros2_control_cleanup_harness test/test_shell_harness.py
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+      ENV NETFT_HARNESS=ros2-control-cleanup
+      TIMEOUT 30
+    )
   endif()
+  install(TARGETS netft_core ARCHIVE DESTINATION lib)
+  install(TARGETS netft_node_cpp netft_check DESTINATION lib/${PROJECT_NAME})
+  install(DIRECTORY include/${PROJECT_NAME}/ DESTINATION include/${PROJECT_NAME})
+  install(TARGETS netft_ros2_control
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin)
   ament_package()
 else()
   message(FATAL_ERROR "ROS_VERSION must be 1 or 2")

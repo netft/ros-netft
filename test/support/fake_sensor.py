@@ -4,7 +4,18 @@ import struct
 import threading
 import time
 
-from netft_driver.protocol import Command, RECORD_STRUCT, REQUEST_STRUCT
+from enum import IntEnum
+
+
+class Command(IntEnum):
+    STOP_STREAMING = 0
+    START_REALTIME = 2
+    START_BUFFERED = 3
+    SET_SOFTWARE_BIAS = 66
+
+
+REQUEST_STRUCT = struct.Struct(">HHI")
+RECORD_STRUCT = struct.Struct(">IIIiiiiii")
 
 
 class FakeNetFTSensor:
@@ -25,6 +36,8 @@ class FakeNetFTSensor:
         self._rdt_sequence = 0
         self._ft_sequence = 1000
         self._rdt_skip = 0
+        self._last_axes = (100, -200, 300, 10, -20, 30)
+        self._software_bias = (0, 0, 0, 0, 0, 0)
 
     @property
     def host(self):
@@ -125,7 +138,10 @@ class FakeNetFTSensor:
             self._client_address = address
             self._streaming = True
             self._rdt_sequence = 0
-        elif command in (Command.STOP_STREAMING, Command.SET_SOFTWARE_BIAS):
+        elif command == Command.SET_SOFTWARE_BIAS:
+            self._software_bias = self._last_axes
+            self._streaming = False
+        elif command == Command.STOP_STREAMING:
             self._streaming = False
 
     def _next_payload(self):
@@ -133,7 +149,6 @@ class FakeNetFTSensor:
             payload = self._payloads.get_nowait()
             if len(payload) == RECORD_STRUCT.size:
                 self._rdt_sequence = struct.unpack(">I", payload[:4])[0]
-            return payload
         except queue.Empty:
             self._rdt_sequence = (
                 self._rdt_sequence + 1 + self._rdt_skip
@@ -151,7 +166,15 @@ class FakeNetFTSensor:
                 30,
             )
             self._ft_sequence = (self._ft_sequence + 4) & 0xFFFFFFFF
+        if len(payload) != RECORD_STRUCT.size:
             return payload
+        record = RECORD_STRUCT.unpack(payload)
+        self._last_axes = record[3:]
+        biased_axes = tuple(
+            value - offset
+            for value, offset in zip(self._last_axes, self._software_bias)
+        )
+        return RECORD_STRUCT.pack(*record[:3], *biased_axes)
 
     def _run(self):
         interval = 1.0 / self.rate_hz

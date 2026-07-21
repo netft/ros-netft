@@ -57,10 +57,20 @@ jobs:
           rosdep update --rosdistro "${ROS_DISTRO}" --include-eol-distros
           rosdep install --from-paths . --ignore-src -r -y \
             --rosdistro "${ROS_DISTRO}"
-          apt-get install -y python3-pytest
+          apt-get install -y python3-pytest procps util-linux
           if [[ "${ROS_VERSION}" == "2" ]]; then
             apt-get install -y python3-colcon-common-extensions
           fi
+      - name: Run ROS-neutral C++ tests
+        shell: bash
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          cmake -S . -B build/core-only -DNETFT_CORE_ONLY=ON
+          cmake --build build/core-only
+          registered_tests="$(ctest --test-dir build/core-only -N | sed -n 's/^Total Tests: //p')"
+          test -n "${registered_tests}"
+          test "${registered_tests}" -gt 0
+          ctest --test-dir build/core-only --output-on-failure
       - name: Run pure and package tests
         shell: bash
         run: |
@@ -75,4 +85,9 @@ jobs:
             bash test/integration/ros1_smoke.sh
           else
             bash test/integration/ros2_smoke.sh
+            if [[ "${ROS_DISTRO}" == "jazzy" ]]; then
+              bash test/integration/ros2_control_isolation_test.sh
+            else
+              bash test/integration/ros2_control_smoke.sh
+            fi
           fi

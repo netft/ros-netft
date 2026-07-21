@@ -18,6 +18,8 @@ def _discover_result(results_root, target):
     accepted_names = {
         "{}.xml".format(target),
         "{}.xunit.xml".format(target),
+        "{}.gtest.xml".format(target),
+        "gtest-{}.xml".format(target),
         "pytest-{}.xml".format(target),
     }
     matches = sorted(

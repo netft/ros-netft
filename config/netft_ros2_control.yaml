@@ -1,0 +1,12 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 200
+    netft_broadcaster:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+netft_broadcaster:
+  ros__parameters:
+    # A ROS-valid token is preserved for the default bias service. Other names
+    # use netft_encoded_ plus their lowercase hexadecimal UTF-8 bytes.
+    sensor_name: netft_sensor
+    frame_id: netft_sensor

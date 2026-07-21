@@ -2,8 +2,8 @@
 
 [workspace]
 name = "ros-netft"
-version = "0.1.0"
-description = "ROS 1 and ROS 2 driver for ATI Net F/T RDT sensors"
+version = "0.2.0"
+description = "Native ROS 1, ROS 2, and ros2_control driver for ATI Net F/T RDT sensors"
 channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64"]
 channel-priority = "strict"
@@ -17,6 +17,21 @@ pytest-timeout = ">=2,<3"
 unit = "python -m pytest -m 'not hardware'"
 ros1-harness = "bash test/integration/ros1_smoke_harness_test.sh"
 ros2-harness = "bash test/integration/ros2_smoke_harness_test.sh"
+ros2-domain-lease-harness = "bash test/integration/ros2_domain_lease_harness_test.sh"
+ros2-control-cleanup-harness = "bash test/integration/ros2_control_cleanup_harness_test.sh"
+ros2-control-isolation = "bash test/integration/ros2_control_isolation_test.sh"
+flock-check = "bash -c 'command -v flock >/dev/null && flock --version'"
+
+[feature.test.dependencies]
+cmake = "*"
+ninja = "*"
+cxx-compiler = "*"
+gtest = "*"
+
+[feature.test.tasks]
+core-configure = "cmake -S . -B build/core-only -G Ninja -DNETFT_CORE_ONLY=ON"
+core-build = "cmake --build build/core-only"
+core-test = "cmake --build build/core-only && ctest --test-dir build/core-only --output-on-failure"
 
 [feature.noetic]
 channels = ["https://prefix.dev/robostack-noetic"]
@@ -38,7 +53,12 @@ channels = ["https://prefix.dev/robostack-humble"]
 
 [feature.humble.dependencies]
 ros-humble-ros-base = "*"
-ros-humble-ament-cmake-python = "*"
+ros-humble-ros2-control = "*"
+ros-humble-ros2-controllers = "*"
+ros-humble-xacro = "*"
+ros-humble-force-torque-sensor-broadcaster = "*"
+ros-humble-controller-manager = "*"
+ros-humble-ros2controlcli = "*"
 colcon-common-extensions = "*"
 make = "*"
 c-compiler = "*"
@@ -47,13 +67,19 @@ cxx-compiler = "*"
 [feature.humble.tasks]
 build = "bash test/integration/build_package.sh"
 smoke = "bash test/integration/ros2_smoke.sh"
+ros2-control-smoke = "bash test/integration/ros2_control_smoke.sh"
 
 [feature.jazzy]
 channels = ["https://prefix.dev/robostack-jazzy"]
 
 [feature.jazzy.dependencies]
 ros-jazzy-ros-base = "*"
-ros-jazzy-ament-cmake-python = "*"
+ros-jazzy-ros2-control = "*"
+ros-jazzy-ros2-controllers = "*"
+ros-jazzy-xacro = "*"
+ros-jazzy-force-torque-sensor-broadcaster = "*"
+ros-jazzy-controller-manager = "*"
+ros-jazzy-ros2controlcli = "*"
 colcon-common-extensions = "*"
 make = "*"
 c-compiler = "*"
@@ -62,13 +88,19 @@ cxx-compiler = "*"
 [feature.jazzy.tasks]
 build = "bash test/integration/build_package.sh"
 smoke = "bash test/integration/ros2_smoke.sh"
+ros2-control-smoke = "bash test/integration/ros2_control_smoke.sh"
 
 [feature.kilted]
 channels = ["https://prefix.dev/robostack-kilted"]
 
 [feature.kilted.dependencies]
 ros-kilted-ros-base = "*"
-ros-kilted-ament-cmake-python = "*"
+ros-kilted-ros2-control = "*"
+ros-kilted-ros2-controllers = "*"
+ros-kilted-xacro = "*"
+ros-kilted-force-torque-sensor-broadcaster = "*"
+ros-kilted-controller-manager = "*"
+ros-kilted-ros2controlcli = "*"
 colcon-common-extensions = "*"
 make = "*"
 c-compiler = "*"
@@ -77,13 +109,19 @@ cxx-compiler = "*"
 [feature.kilted.tasks]
 build = "bash test/integration/build_package.sh"
 smoke = "bash test/integration/ros2_smoke.sh"
+ros2-control-smoke = "bash test/integration/ros2_control_smoke.sh"
 
 [feature.lyrical]
 channels = ["https://prefix.dev/robostack-lyrical"]
 
 [feature.lyrical.dependencies]
 ros-lyrical-ros-base = "*"
-ros-lyrical-ament-cmake-python = "*"
+ros-lyrical-ros2-control = "*"
+ros-lyrical-ros2-controllers = "*"
+ros-lyrical-xacro = "*"
+ros-lyrical-force-torque-sensor-broadcaster = "*"
+ros-lyrical-controller-manager = "*"
+ros-lyrical-ros2controlcli = "*"
 colcon-common-extensions = "*"
 make = "*"
 c-compiler = "*"
@@ -92,13 +130,19 @@ cxx-compiler = "*"
 [feature.lyrical.tasks]
 build = "bash test/integration/build_package.sh"
 smoke = "bash test/integration/ros2_smoke.sh"
+ros2-control-smoke = "bash test/integration/ros2_control_smoke.sh"
 
 [feature.rolling]
 channels = ["https://prefix.dev/robostack-rolling"]
 
 [feature.rolling.dependencies]
 ros-rolling-ros-base = "*"
-ros-rolling-ament-cmake-python = "*"
+ros-rolling-ros2-control = "*"
+ros-rolling-ros2-controllers = "*"
+ros-rolling-xacro = "*"
+ros-rolling-force-torque-sensor-broadcaster = "*"
+ros-rolling-controller-manager = "*"
+ros-rolling-ros2controlcli = "*"
 colcon-common-extensions = "*"
 make = "*"
 c-compiler = "*"
@@ -107,9 +151,10 @@ cxx-compiler = "*"
 [feature.rolling.tasks]
 build = "bash test/integration/build_package.sh"
 smoke = "bash test/integration/ros2_smoke.sh"
+ros2-control-smoke = "bash test/integration/ros2_control_smoke.sh"
 
 [environments]
-test = { features = [] }
+test = { features = ["test"] }
 noetic = { features = ["noetic"], solve-group = "noetic" }
 humble = { features = ["humble"], solve-group = "humble" }
 jazzy = { features = ["jazzy"], solve-group = "jazzy" }

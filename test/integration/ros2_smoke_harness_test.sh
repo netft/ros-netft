@@ -85,10 +85,6 @@ cleanup_status_inner() {
   shutdown_child() {
     return 1
   }
-  stop_ros2_daemon() {
-    return 0
-  }
-
   temp_root="$cleanup_root"
   node_pid=111111
   sensor_pid=222222
@@ -155,56 +151,6 @@ emergency_cleanup() {
 }
 trap emergency_cleanup EXIT
 
-test_early_failure_domain_isolation() {
-  local stub_bin="$test_root/stub-bin"
-  local daemon_log="$test_root/daemon.log"
-  mkdir -p "$stub_bin"
-  printf '%s\n' \
-    '#!/usr/bin/env bash' \
-    'exit 19' >"$stub_bin/colcon"
-  printf '%s\n' \
-    '#!/usr/bin/env bash' \
-    'printf '\''domain=%s local=%s args=%s\n'\'' "${ROS_DOMAIN_ID-unset}" "${ROS_LOCALHOST_ONLY-unset}" "$*" >>"$ROS2_STUB_LOG"' \
-    'exit 0' >"$stub_bin/ros2"
-  chmod +x "$stub_bin/colcon" "$stub_bin/ros2"
-
-  local inherited_domain
-  for inherited_domain in 42 unset; do
-    : >"$daemon_log"
-    set +e
-    if [[ "$inherited_domain" == "unset" ]]; then
-      env -u ROS_DOMAIN_ID -u ROS_LOCALHOST_ONLY \
-        PATH="$stub_bin:$PATH" ROS2_STUB_LOG="$daemon_log" \
-        timeout --kill-after=1s 5s bash -s -- "$smoke_script" <<'BASH'
-set -euo pipefail
-source "$1"
-main
-BASH
-    else
-      env ROS_DOMAIN_ID="$inherited_domain" ROS_LOCALHOST_ONLY=0 \
-        PATH="$stub_bin:$PATH" ROS2_STUB_LOG="$daemon_log" \
-        timeout --kill-after=1s 5s bash -s -- "$smoke_script" <<'BASH'
-set -euo pipefail
-source "$1"
-main
-BASH
-    fi
-    local smoke_status=$?
-    set -e
-    [[ "$smoke_status" -eq 19 ]] ||
-      fail "early failure status changed from 19 to $smoke_status"
-    [[ -s "$daemon_log" ]] || fail "daemon-stop fixture was not called"
-    local selected_domain
-    selected_domain="$(sed -n 's/^domain=\([^ ]*\).*/\1/p' "$daemon_log")"
-    [[ "$selected_domain" =~ ^[0-9]+$ ]] ||
-      fail "daemon stop used non-isolated domain: $selected_domain"
-    (( selected_domain >= 100 && selected_domain <= 199 )) ||
-      fail "daemon stop addressed inherited/default domain $selected_domain"
-    grep -q ' local=1 args=daemon stop$' "$daemon_log" ||
-      fail "daemon stop did not retain local-only isolation"
-  done
-}
-
 test_live_helper_is_bounded() {
   local helper_kind="$1"
   local wait_marker="$test_root/wait-$helper_kind"
@@ -268,9 +214,6 @@ test_command_history_is_exact() {
 
 run_requested_test() {
   case "${1:-all}" in
-    early_domain)
-      test_early_failure_domain_isolation
-      ;;
     live_child)
       test_live_helper_is_bounded child
       ;;
@@ -293,7 +236,6 @@ run_requested_test() {
       test_command_history_is_exact
       ;;
     all)
-      test_early_failure_domain_isolation
       test_live_helper_is_bounded child
       test_live_helper_is_bounded group
       test_zombie_helper_is_reaped child

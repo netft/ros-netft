@@ -17,22 +17,26 @@ sensitive information before posting.
 ## Development environment
 
 [Pixi](https://pixi.sh/) provides the repository-local test environments. Run
-the ROS-neutral suite and shell harnesses with:
+the ROS-neutral C++ and policy suites with:
 
 ```bash
+pixi run -e test core-configure
+pixi run -e test core-build
+pixi run -e test core-test
 pixi run -e test unit
-pixi run ros1-harness
-pixi run ros2-harness
 ```
 
-Build and smoke-test the ROS distributions affected by your change. For
-example:
+The native package and graph gates use only loopback fake sensors. Run every
+gate for each distribution affected by the change. For example:
 
 ```bash
+pixi run ros1-harness
+pixi run ros2-harness
 pixi run -e noetic build
 pixi run -e noetic smoke
 pixi run -e jazzy build
 pixi run -e jazzy smoke
+pixi run -e jazzy ros2-control-smoke
 ```
 
 The available Pixi environments are `noetic`, `humble`, `jazzy`, `kilted`,
@@ -48,7 +52,8 @@ Before opening a pull request:
 3. Add or update tests for behavior changes.
 4. Update user documentation when commands, parameters, interfaces, or safety
    behavior change. Repository content must be written in English.
-5. Run the ROS-neutral suite and the relevant ROS build and smoke tests.
+5. Run the ROS-neutral C++ and policy suites plus the relevant ROS build,
+   standalone smoke, and ros2_control smoke tests.
 6. Complete the pull-request template and address CI results and review
    feedback.
 

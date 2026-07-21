@@ -178,28 +178,13 @@ main() {
   fi
   echo "ROS 1 installed package path: $resolved_package_path"
 
-  installed_module_path="$(
-    python3 - "$temp_root/ws/install" <<'PY'
-from pathlib import Path
-import sys
-
-import netft_driver
-
-
-install_root = Path(sys.argv[1]).resolve()
-module_path = Path(netft_driver.__file__).resolve()
-try:
-    module_path.relative_to(install_root)
-except ValueError:
-    raise SystemExit(
-        "netft_driver imported outside the temporary install space: {}".format(
-            module_path
-        )
-    )
-print(module_path)
-PY
-  )"
-  echo "ROS 1 installed Python module: $installed_module_path"
+  installed_node_path="$temp_root/ws/install/lib/netft_driver/netft_node"
+  installed_check_path="$temp_root/ws/install/lib/netft_driver/netft_check"
+  test -x "$installed_node_path"
+  test -x "$installed_check_path"
+  test "$(head -c 2 "$installed_node_path")" != '#!'
+  rosrun netft_driver netft_check --help >/dev/null
+  echo "ROS 1 installed native executable: $installed_node_path"
 
   master_port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
   export ROS_MASTER_URI="http://127.0.0.1:${master_port}"
@@ -223,35 +208,59 @@ PY
   done
   sensor_port="$(cat "$temp_root/sensor.port")"
 
-  rosrun netft_driver netft_node \
+  rosrun netft_driver netft_node __ns:=/netft_smoke wrench:=remapped_wrench \
     _sensor_ip:=127.0.0.1 \
     _sensor_port:="$sensor_port" \
+    _frame_id:=smoke_frame _wrench_topic:=wrench _bias_service:=bias \
+    _counts_per_force:=2000000.0 _counts_per_torque:=4000000.0 _publish_rate:=50.0 \
+    _receive_timeout:=0.8 _reconnect_initial_delay:=0.11 _reconnect_max_delay:=0.37 \
     _expected_rdt_rate:=200.0 \
-    _diagnostics_rate:=10.0 \
+    _diagnostics_rate:=5.0 _rate_tolerance:=0.35 _publish_on_error:=true \
     >"$temp_root/node.log" 2>&1 &
   node_pid=$!
 
   for _ in $(seq 1 100); do
-    timeout --kill-after=0.2s 0.5s rosservice info /netft/bias \
+    timeout --kill-after=0.2s 0.5s rosservice info /netft_smoke/bias \
       >/dev/null 2>&1 && break
     sleep 0.05
   done
-  timeout --kill-after=0.2s 0.5s rosservice info /netft/bias >/dev/null
+  timeout --kill-after=0.2s 0.5s rosservice info /netft_smoke/bias >/dev/null
+  test "$(timeout --kill-after=0.2s 0.5s rosservice type /netft_smoke/bias)" = \
+    "std_srvs/Trigger"
+  timeout --kill-after=1s 3s rosnode info /netft_smoke/netft \
+    >"$temp_root/graph.txt"
+  grep -q '^ \* /netft_smoke/remapped_wrench ' "$temp_root/graph.txt"
+  grep -Fxq ' * /netft_smoke/bias' "$temp_root/graph.txt"
+  timeout --kill-after=0.2s 0.5s rostopic list >"$temp_root/topics.txt"
+  grep -Fxq '/netft_smoke/remapped_wrench' "$temp_root/topics.txt"
+  if grep -Fxq '/netft_smoke/wrench' "$temp_root/topics.txt"; then
+    echo "unremapped relative wrench topic unexpectedly exists" >&2
+    return 1
+  fi
 
-  timeout --kill-after=2s 10s rostopic echo -n 1 /netft/wrench \
+  timeout --kill-after=2s 10s rostopic echo -n 1 /netft_smoke/remapped_wrench \
     >"$temp_root/wrench.txt"
-  grep -q 'frame_id: "netft_link"' "$temp_root/wrench.txt"
-  grep -q 'x: 0.0001' "$temp_root/wrench.txt"
+  python3 "$repo_root/test/integration/ros_graph_assertions.py" wrench \
+    "$temp_root/wrench.txt" --ros-version 1 --frame-id smoke_frame \
+    --axes 0.00005 -0.0001 0.00015 0.0000025 -0.000005 0.0000075
 
-  timeout --kill-after=2s 10s rostopic echo -n 1 /diagnostics \
+  sleep 1
+  timeout --kill-after=2s 10s rostopic echo -n 5 /diagnostics \
     >"$temp_root/diagnostics.txt"
   grep -q 'netft_driver: connection' "$temp_root/diagnostics.txt"
-  grep -q '127.0.0.1:' "$temp_root/diagnostics.txt"
+  grep -q "hardware_id: \"127.0.0.1:$sensor_port\"" "$temp_root/diagnostics.txt"
+  python3 "$repo_root/test/integration/ros_graph_assertions.py" diagnostics \
+    "$temp_root/diagnostics.txt" --ros-version 1 \
+    --status-header "$repo_root/include/netft_driver/status.hpp" \
+    --expected-rate 5.0 --configured-publish-rate 50.0 \
+    --expected-value "sensor=127.0.0.1:$sensor_port" \
+    --expected-value expected_receive_rate_hz=200.0 \
+    --expected-value rate_tolerance=0.350
 
-  timeout --kill-after=2s 10s rosservice call /netft/bias '{}' \
+  timeout --kill-after=2s 10s rosservice call /netft_smoke/bias '{}' \
     >"$temp_root/bias.txt"
   grep -q 'success: True' "$temp_root/bias.txt"
-  timeout --kill-after=2s 10s rostopic echo -n 1 /netft/wrench \
+  timeout --kill-after=2s 10s rostopic echo -n 1 /netft_smoke/remapped_wrench \
     >"$temp_root/post_bias.txt"
 
   if shutdown_node; then

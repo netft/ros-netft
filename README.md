@@ -4,34 +4,35 @@
 [![ROS](https://img.shields.io/badge/ROS-1%20%7C%202-22314E.svg?logo=ros&logoColor=white)](https://www.ros.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`netft_driver` publishes `geometry_msgs/WrenchStamped` force and torque data
-from ATI Ethernet Net F/T and Ethernet Axia sensors through the UDP Raw Data
-Transfer (RDT) protocol. One ROS-neutral transport core serves native ROS 1 and
-ROS 2 adapters.
+`netft_driver` acquires force and torque data from ATI Ethernet Net F/T and
+Ethernet Axia sensors over the UDP Raw Data Transfer (RDT) protocol. A native
+C++17 core supports both a standalone ROS node and a `ros2_control` sensor
+hardware plugin.
 
-- Resilient RDT streaming with timeout recovery and bounded reconnect backoff
-- Connection, sequence, rate, and device-status diagnostics with serious-sample
-  filtering
-- Explicit software bias and a bounded, non-biasing `netft_check` operator tool
+- Native ROS 1 and ROS 2 standalone driver with wrench, diagnostics, and bias
+  interfaces
+- `ros2_control` `SensorInterface` for the standard force-torque broadcaster
+  and controller integrations
+- Sequence, receive-rate, device-status, timeout, and reconnect diagnostics
 
-## Release status
+## Supported ROS distributions
 
-ROS binary packages are not published yet.
-
-| ROS distribution | Branch | Source support | Binary packages |
-|---|---|---|---|
-| ROS 2 Lyrical | `main` | Supported | Not released |
-| ROS 2 Kilted | `main` | Supported | Not released |
-| ROS 2 Jazzy | `main` | Supported | Not released |
-| ROS 2 Humble | `main` | Supported | Not released |
-| ROS 2 Rolling | `main` | Supported | Not released |
-| ROS 1 Noetic* | `main` | Legacy | Not released |
+| ROS distribution | Standalone driver | `ros2_control` plugin | Support policy |
+|---|---:|---:|---|
+| ROS 2 Lyrical | Yes | Yes | Supported |
+| ROS 2 Kilted | Yes | Yes | Supported |
+| ROS 2 Jazzy | Yes | Yes | Supported |
+| ROS 2 Humble | Yes | Yes | Compatibility |
+| ROS 2 Rolling | Yes | Yes | Development |
+| ROS 1 Noetic* | Yes | N/A | Legacy source support |
 
 \* *ROS 1 Noetic is end-of-life and supported from source only.*
 
 ## Installation
 
 ### ROS 2 source installation
+
+Replace `lyrical` with another supported ROS 2 distribution when required.
 
 ```bash
 source /opt/ros/lyrical/setup.bash
@@ -46,8 +47,8 @@ source install/setup.bash
 
 ### ROS 1 Noetic legacy source installation
 
-Noetic is end-of-life and supported from source only. Refresh rosdep with EOL
-distribution metadata enabled before resolving dependencies.
+Refresh rosdep with EOL distribution metadata enabled before resolving Noetic
+dependencies.
 
 ```bash
 source /opt/ros/noetic/setup.bash
@@ -63,37 +64,137 @@ source devel/setup.bash
 
 ## Quick start
 
-1. Connect the host to the sensor network, confirm the configured endpoint is
-   reachable, and stop the ATI Java demo or any other RDT client. The sensor
-   permits only one UDP client.
+ATI RDT permits one UDP client. Stop the ATI Java demo and every other RDT
+client before starting this driver.
 
-2. Launch the driver. ROS 2:
+### Standalone driver
 
-   ```bash
-   ros2 launch netft_driver netft.launch.py sensor_ip:=192.168.31.100 sensor_port:=49152
-   ```
+Launch ROS 2:
 
-   ROS 1:
+```bash
+ros2 launch netft_driver netft.launch.py sensor_ip:=192.168.31.100 sensor_port:=49152
+ros2 topic echo --once /netft/wrench
+ros2 topic echo --once /diagnostics
+```
 
-   ```bash
-   roslaunch netft_driver netft.launch sensor_ip:=192.168.31.100 sensor_port:=49152
-   ```
+Launch ROS 1:
 
-3. Verify one wrench message and the diagnostics. ROS 2:
+```bash
+roslaunch netft_driver netft.launch sensor_ip:=192.168.31.100 sensor_port:=49152
+rostopic echo -n 1 /netft/wrench
+rostopic echo -n 1 /diagnostics
+```
 
-   ```bash
-   ros2 topic echo --once /netft/wrench
-   ros2 topic echo --once /diagnostics
-   ```
+Run a bounded, non-biasing endpoint check without starting a ROS graph:
 
-   ROS 1:
+```bash
+# ROS 2
+ros2 run netft_driver netft_check --host 192.168.31.100 --duration 5
 
-   ```bash
-   rostopic echo -n 1 /netft/wrench
-   rostopic echo -n 1 /diagnostics
-   ```
+# ROS 1
+rosrun netft_driver netft_check --host 192.168.31.100 --duration 5
+```
 
-## Interfaces
+### ros2_control integration
+
+The plugin class is `netft_driver/NetFTHardwareInterface`. Embed the installed
+`urdf/netft.ros2_control.xacro` macro in the robot description that is already
+managed by your controller manager:
+
+```xml
+<xacro:include filename="$(find netft_driver)/urdf/netft.ros2_control.xacro"/>
+<xacro:netft_ros2_control
+  name="wrist_netft_hardware"
+  sensor_name="wrist_ft"
+  sensor_ip="192.168.31.100"
+  sensor_port="49152"
+  receive_timeout="0.1"
+  activation_timeout="2.0"/>
+```
+
+Configure the standard broadcaster using the pattern installed at
+`config/netft_ros2_control.yaml`:
+
+```yaml
+controller_manager:
+  ros__parameters:
+    update_rate: 1000
+    wrist_ft_broadcaster:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+wrist_ft_broadcaster:
+  ros__parameters:
+    sensor_name: wrist_ft
+    frame_id: wrist_ft_link
+```
+
+Spawn the broadcaster through the controller manager used by the robot:
+
+```bash
+ros2 run controller_manager spawner wrist_ft_broadcaster \
+  --controller-manager /controller_manager \
+  --param-file /path/to/controllers.yaml
+```
+
+The repository also installs `netft_ros2_control.launch.py` as a minimal
+single-sensor example. Production robot descriptions should embed the Xacro
+in their existing controller-manager setup rather than start another manager.
+
+The sensor exports exactly these six state interfaces:
+
+```text
+<sensor_name>/force.x
+<sensor_name>/force.y
+<sensor_name>/force.z
+<sensor_name>/torque.x
+<sensor_name>/torque.y
+<sensor_name>/torque.z
+```
+
+Each plugin instance owns its socket, receiver thread, state buffer,
+diagnostics, and default `/<encoded sensor token>/bias` service. Distinct
+sensor names therefore provide isolated service and state-interface names for
+multiple sensors in one controller-manager process.
+
+For the auxiliary node and default bias service, a `sensor_name` that is a
+ROS-valid token is preserved unless it starts with the reserved prefix
+`netft_encoded_`. Every other name, including names that start with that
+prefix, uses `netft_encoded_` followed by the lowercase hexadecimal UTF-8 bytes
+of the complete original name. This injective mapping keeps names such as
+`tool-ft` and `tool_ft` isolated. An explicit `bias_service` is used unchanged.
+
+The plugin uses a fail-stop recovery policy. A fatal device, transport,
+timeout, FT-sequence, or malformed-storm fault latches the first cause, writes
+`NaN` to all six interfaces, and makes `read()` return `ERROR`. It does not
+reconnect while active. Inspect the hardware and `/diagnostics`, correct the
+cause, then recover the component through its controller-manager lifecycle.
+The complete recovery path is active → inactive (deactivate) → unconfigured
+(cleanup) → inactive (configure) → active (activate). The fatal fault is
+cleared during configure, not during deactivate or cleanup. If the controller
+manager has already moved the component to inactive or unconfigured, skip the
+state transitions that are not applicable. Use the component name passed as
+the Xacro `name`, for example:
+
+```bash
+ros2 control list_hardware_components
+ros2 control set_hardware_component_state wrist_netft_hardware inactive
+ros2 control set_hardware_component_state wrist_netft_hardware unconfigured
+ros2 control set_hardware_component_state wrist_netft_hardware inactive
+ros2 control set_hardware_component_state wrist_netft_hardware active
+```
+
+On Humble, controller manager does not consistently deactivate affected
+controllers when a hardware `read()` returns `ERROR`. Humble integrations must
+reject non-finite (`NaN`) input in their controllers or provide an independent
+system-level safety monitor. This driver does not replace the robot's safety
+system.
+
+The receiver performs UDP I/O outside the controller-manager update loop and
+transfers complete samples through `realtime_tools::RealtimeBuffer`. This is a
+control-loop-friendly design; UDP, Linux scheduling, and sensor firmware mean
+end-to-end hard real-time behavior is not guaranteed.
+
+## Standalone interfaces
 
 | Interface | Default name | Type and behavior |
 |---|---|---|
@@ -108,21 +209,12 @@ complete record is accepted.
 
 Status `0x00000000` is healthy and `0x80010000` is a monitor-condition warning.
 Every other nonzero status is a serious device error decoded by bit in
-`/diagnostics`. Serious records are withheld from `/netft/wrench` unless
-`publish_on_error=true`.
-
-Diagnostics report connection state and endpoint; RDT and FT sequence values;
-FT progress classification; receive, publish, expected receive rates, and
-tolerance; loss, duplicate, out-of-order, malformed, device-error, reconnect,
-and timeout counts; last-record age; and the last exception. A serious status
-or timeout recovered between timer ticks is
-reported as `ERROR` for at least one diagnostic update after recovery. A
-malformed-packet storm means
-10 or more malformed datagrams between consecutive diagnostic updates; that
-interval is `ERROR`, while every malformed datagram remains in the cumulative
-count. `BACKOFF` is immediately `ERROR`.
+`/diagnostics`. Standalone nodes withhold serious records from `/netft/wrench`
+unless `publish_on_error=true`.
 
 ## Configuration
+
+### Standalone parameters
 
 | Parameter | Default | Meaning |
 |---|---:|---|
@@ -142,101 +234,94 @@ count. `BACKOFF` is immediately `ERROR`.
 | `rate_tolerance` | `0.2` | Allowed fractional receive-rate deviation |
 | `publish_on_error` | `false` | Publish serious-status samples when true |
 
-Force and torque counts use independent scales and are published in N and Nm.
-Positive `publish_rate` limiting drops intermediate samples instead of queuing
-stale wrench messages. The default endpoint, 2,000 Hz expectation, units, and
-scales are configuration provenance from an inspected Ethernet Axia profile,
-not a runtime validation result for another installation.
+### ros2_control parameters
+
+The Xacro exposes the endpoint, independent force and torque scales,
+`receive_timeout`, and `activation_timeout`. Additional hardware parameters
+may be placed in the generated `<hardware>` element:
+
+| Parameter | Default | Meaning |
+|---|---:|---|
+| `activation_timeout` | `2.0` | Seconds to wait for the first healthy sample |
+| `bias_service` | `/<encoded sensor token>/bias` | Instance-specific software-bias service; see the encoding rule above |
+| `diagnostics_rate` | `1.0` | Diagnostics publication rate in Hz |
+| `expected_rdt_rate` | `2000.0` | Expected sensor receive rate in Hz |
+| `rate_tolerance` | `0.2` | Allowed fractional receive-rate deviation |
+
+`frame_id`, `wrench_topic`, and publication rate belong to the broadcaster in
+`ros2_control`. Standalone reconnect-delay and `publish_on_error` parameters do
+not apply to the fail-stop plugin.
 
 ## Operations and safety
 
-ATI RDT allows one UDP client. Stop other RDT clients before starting the
-driver; a competing client can take stream ownership and cause timeout and
-reconnect cycles. On normal ROS shutdown the driver sends Stop Streaming
-(`0x0000`). Use normal shutdown whenever possible so streaming does not remain
-active at the sensor.
-
-The driver does not change persistent web configuration, calibration, filter,
-transform, RDT rate, units, or network settings. It sends only streaming,
-stop, and an explicitly requested software-bias command.
-
-RDT gaps count as network loss. FT sequence gaps are normal because the ADC can
-run faster than RDT; FT stalls and backward movement are faults. FT tracking
-survives reconnects, and a backward first FT value in a new RDT session remains
-an error. A sensor restart is confirmed only after a retained baseline of at
-least `0x00010000` is followed by two advancing backward values in the low
-window `0x00000000` through `0x0000ffff`; confirmation re-baselines tracking.
-At a 7,812 Hz ADC rate, this low window spans about 8.4 seconds and keeps
-ambiguous high backward values classified as errors. An advancing normal value
-or a new RDT session clears an unconfirmed restart candidate. ROS-native
-warning and error logs are emitted on fault transitions; a persistent fault is
-repeated at most once every 10 seconds so console logging stays bounded.
-
-Run a bounded, non-biasing operator check without starting a ROS graph. ROS 2:
-
-```bash
-ros2 run netft_driver netft_check --host 192.168.31.100 --duration 5
-```
-
-ROS 1:
-
-```bash
-rosrun netft_driver netft_check --host 192.168.31.100 --duration 5
-```
+On normal shutdown the driver sends Stop Streaming (`0x0000`) and closes its
+socket. Use normal shutdown whenever possible so streaming does not remain
+active at the sensor. The driver sends only start, stop, and explicitly
+requested software-bias commands; it does not change persistent web,
+calibration, filtering, transform, rate, unit, or network settings.
 
 > **Warning:** Software bias changes the sensor's zero. Call it only when the
 > sensor is stationary, unloaded, and safe. ATI RDT does not acknowledge the
-> bias command; verify the resumed wrench and diagnostics before force control.
+> bias command; verify healthy wrench data and diagnostics resume before using
+> the measurement for control.
 
-ROS 2:
+Call the standalone service with:
 
 ```bash
+# ROS 2
 ros2 service call /netft/bias std_srvs/srv/Trigger '{}'
-```
 
-ROS 1:
-
-```bash
+# ROS 1
 rosservice call /netft/bias '{}'
 ```
 
-A successful service response means the bias and stream-restart datagrams were
-sent, not that the sensor acknowledged safe conditions.
+For `ros2_control`, call the instance service only while the component is
+active:
+
+```bash
+ros2 service call /wrist_ft/bias std_srvs/srv/Trigger '{}'
+```
+
+A successful response means only that the bias and stream-restart datagrams
+were sent. If healthy data does not resume before `receive_timeout`, the plugin
+latches a fail-stop fault and requires lifecycle recovery.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Operator action |
 |---|---|---|
-| Repeated timeout or reconnect | Network path, power, firewall, endpoint, or stream ownership problem | Check reachability, UDP port `49152`, sensor power, firewall, and `/diagnostics`. |
-| Missing wrench | No accepted record, serious status filtering, or wrong topic | Inspect `/diagnostics`, confirm `wrench_topic`, and resolve device errors; use `publish_on_error` only after risk review. |
-| Wrong magnitude | Counts-per-unit or sensor units do not match | Read Counts per Force, Counts per Torque, and units from the sensor page; configure independent N and Nm scales. |
-| Receive-rate warning | `expected_rdt_rate` differs from RDT Output Rate | Compare the parameter with Communications page RDT Output Rate, not ADC Sampling Frequency. |
-| Nonzero device status | Monitor condition or serious sensor fault | Inspect decoded diagnostic keys; do not use serious-fault wrench data for force control. |
-| Wrench absent after bias | Stream did not resume or another fault intervened | Inspect timeout, connection, and device diagnostics; do not issue repeated bias commands as recovery. |
-| Competing RDT client | Another application owns the single-client stream | Stop the ATI Java demo and every other RDT client, then allow reconnect. |
+| Repeated timeout or reconnect | Network path, power, firewall, endpoint, or competing RDT client | Check the endpoint, UDP port `49152`, sensor power, firewall, and `/diagnostics`. |
+| Missing standalone wrench | No accepted record, serious-status filtering, or wrong topic | Inspect `/diagnostics`, confirm `wrench_topic`, and resolve device errors. |
+| `NaN` plugin interfaces | A fail-stop fault is latched | Read the persistent ERROR diagnostic, correct the cause, and perform lifecycle recovery. |
+| Wrong magnitude | Counts-per-unit or sensor units do not match | Configure the sensor's independent Counts per Force and Counts per Torque values for N and Nm. |
+| Receive-rate warning | `expected_rdt_rate` differs from RDT Output Rate | Compare the parameter with the Communications page RDT Output Rate, not ADC Sampling Frequency. |
+| Wrench absent after bias | Streaming did not resume or another fault intervened | Inspect timeout and device diagnostics; do not issue repeated bias commands as recovery. |
 
 ## Development
 
-The repository-local Pixi tasks run the pure suite, shell harnesses, native
-builds, and loopback graph smoke tests:
+Pixi provides locked local environments for the ROS-neutral suite and every
+supported distribution:
 
 ```bash
+pixi run -e test core-configure
+pixi run -e test core-build
+pixi run -e test core-test
 pixi run -e test unit
-pixi run ros1-harness
-pixi run ros2-harness
 pixi run -e noetic build
 pixi run -e noetic smoke
-pixi run -e lyrical build
-pixi run -e lyrical smoke
+pixi run -e humble build
+pixi run -e humble smoke
+pixi run -e humble ros2-control-smoke
 ```
 
-See [Architecture](docs/architecture.md) for package and lifecycle boundaries.
+See [Architecture](docs/architecture.md) for implementation and lifecycle
+boundaries.
 
 ## Contributing
 
-Contributions are welcome. Read the [contributing guide](CONTRIBUTING.md) before
-opening an [issue](https://github.com/han-xudong/ros-netft/issues) or submitting
-a [pull request](https://github.com/han-xudong/ros-netft/pulls).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an
+[issue](https://github.com/han-xudong/ros-netft/issues) or a
+[pull request](https://github.com/han-xudong/ros-netft/pulls).
 
 ## License
 
