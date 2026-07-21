@@ -5,7 +5,7 @@ documentation fixes, tests, and code contributions are welcome.
 
 ## Reporting issues
 
-Search [open and closed issues](https://github.com/han-xudong/ros-netft/issues)
+Search [open and closed issues](https://github.com/netft/ros-netft/issues)
 before filing a new report. Use the bug-report form for reproducible failures
 and the feature-request form for proposed behavior.
 

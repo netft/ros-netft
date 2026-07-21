@@ -1,6 +1,6 @@
 # ROS Net F/T Driver
 
-[![CI](https://github.com/han-xudong/ros-netft/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/han-xudong/ros-netft/actions/workflows/ci.yml)
+[![CI](https://github.com/netft/ros-netft/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/netft/ros-netft/actions/workflows/ci.yml)
 [![ROS](https://img.shields.io/badge/ROS-1%20%7C%202-22314E.svg?logo=ros&logoColor=white)](https://www.ros.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -37,7 +37,7 @@ Replace `lyrical` with another supported ROS 2 distribution when required.
 ```bash
 source /opt/ros/lyrical/setup.bash
 mkdir -p ~/netft_ws/src
-git clone https://github.com/han-xudong/ros-netft.git \
+git clone https://github.com/netft/ros-netft.git \
   ~/netft_ws/src/netft_driver
 cd ~/netft_ws
 rosdep install --from-paths src --ignore-src -r -y
@@ -53,7 +53,7 @@ dependencies.
 ```bash
 source /opt/ros/noetic/setup.bash
 mkdir -p ~/netft_ws/src
-git clone https://github.com/han-xudong/ros-netft.git \
+git clone https://github.com/netft/ros-netft.git \
   ~/netft_ws/src/netft_driver
 cd ~/netft_ws
 rosdep update --include-eol-distros
@@ -320,8 +320,8 @@ boundaries.
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an
-[issue](https://github.com/han-xudong/ros-netft/issues) or a
-[pull request](https://github.com/han-xudong/ros-netft/pulls).
+[issue](https://github.com/netft/ros-netft/issues) or a
+[pull request](https://github.com/netft/ros-netft/pulls).
 
 ## License
 

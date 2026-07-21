@@ -4,11 +4,22 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   native-ros:
     name: ROS ${{ matrix.distro }} (${{ matrix.policy }})
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +57,7 @@ jobs:
     steps:
       - name: Install checkout dependency
         run: apt-get update && apt-get install -y git
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install source dependencies
         shell: bash
         run: |
@@ -91,3 +102,15 @@ jobs:
               bash test/integration/ros2_control_smoke.sh
             fi
           fi
+
+  ci-success:
+    name: CI success
+    if: always()
+    needs: native-ros
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify required jobs
+        env:
+          NATIVE_ROS_RESULT: ${{ needs.native-ros.result }}
+        run: test "${NATIVE_ROS_RESULT}" = "success"

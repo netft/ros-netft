@@ -1,0 +1,42 @@
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "**/*.rst"
+          - "docs/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/dependabot.yml"
+          - ".github/labeler.yml"
+          - ".github/release-drafter.yml"
+          - "pixi.toml"
+          - "pixi.lock"
+
+driver:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "include/**"
+          - "src/**"
+          - "config/**"
+          - "launch/**"
+
+ros2-control:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ros2_control/**"
+          - "urdf/**"
+          - "netft_driver_plugins.xml"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: "test/**"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "package.xml"
+          - "pixi.toml"
+          - "pixi.lock"

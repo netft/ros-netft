@@ -6,9 +6,9 @@
   <description>Native ROS 1, ROS 2, and ros2_control driver for ATI Net F/T RDT sensors.</description>
   <maintainer email="hanxudong159@126.com">Xudong Han</maintainer>
   <license>MIT</license>
-  <url type="website">https://github.com/han-xudong/ros-netft</url>
-  <url type="repository">https://github.com/han-xudong/ros-netft</url>
-  <url type="bugtracker">https://github.com/han-xudong/ros-netft/issues</url>
+  <url type="website">https://github.com/netft/ros-netft</url>
+  <url type="repository">https://github.com/netft/ros-netft</url>
+  <url type="bugtracker">https://github.com/netft/ros-netft/issues</url>
   <author email="hanxudong159@126.com">Xudong Han</author>
 
   <buildtool_depend condition="$ROS_VERSION == 1">catkin</buildtool_depend>

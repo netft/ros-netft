@@ -4,7 +4,7 @@ from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[1]
-REPOSITORY_URL = "https://github.com/han-xudong/ros-netft"
+REPOSITORY_URL = "https://github.com/netft/ros-netft"
 BUGTRACKER_URL = REPOSITORY_URL + "/issues"
 
 
@@ -416,8 +416,7 @@ def test_native_ci_has_the_supported_source_matrix_without_release_claims():
     assert 'rosdep update --rosdistro "${ROS_DISTRO}" --include-eol-distros' in workflow
     assert "rosdep install --from-paths . --ignore-src -r -y" in workflow
     assert "apt-get install -y python3-pytest" in workflow
-    assert "actions/checkout@v7" in workflow
-    assert "actions/checkout@v4" not in workflow
+    assert re.search(r"actions/checkout@[0-9a-f]{40} # v7", workflow)
     assert "cmake -S . -B build/core-only" in workflow
     assert "cmake --build build/core-only" in workflow
     assert "ctest --test-dir build/core-only --output-on-failure" in workflow
