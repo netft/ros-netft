@@ -1,6 +1,7 @@
 # ROS Net F/T Driver
 
 [![CI](https://github.com/netft/ros-netft/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/netft/ros-netft/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/gh/netft/ros-netft/graph/badge.svg?branch=main)](https://app.codecov.io/gh/netft/ros-netft)
 [![ROS](https://img.shields.io/badge/ROS-1%20%7C%202-22314E.svg?logo=ros&logoColor=white)](https://www.ros.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
