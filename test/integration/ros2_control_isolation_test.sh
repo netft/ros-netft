@@ -17,6 +17,25 @@ process_state() {
   printf '%s\n' "${remainder%% *}"
 }
 
+process_group_has_live_members() {
+  local group_id="$1"
+  local process_group
+  local remainder
+  local state
+  local stat_line
+  local stat_path
+  for stat_path in /proc/[0-9]*/stat; do
+    IFS= read -r stat_line 2>/dev/null <"$stat_path" || continue
+    remainder="${stat_line##*) }"
+    [[ "$remainder" != "$stat_line" ]] || continue
+    read -r state _ process_group _ <<<"$remainder"
+    if [[ "$process_group" == "$group_id" && "$state" != Z && "$state" != X ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 terminate_active_pid() {
   local pid="$1"
   local pgid="$pid"
@@ -32,7 +51,7 @@ terminate_active_pid() {
         leader_reaped=1
       fi
     fi
-    if ! kill -0 -- "-$pgid" 2>/dev/null; then
+    if ! process_group_has_live_members "$pgid"; then
       if ((leader_reaped == 0)); then
         wait "$pid" 2>/dev/null || true
       fi
@@ -50,7 +69,7 @@ terminate_active_pid() {
         leader_reaped=1
       fi
     fi
-    if ! kill -0 -- "-$pgid" 2>/dev/null; then
+    if ! process_group_has_live_members "$pgid"; then
       if ((leader_reaped == 0)); then
         wait "$pid" 2>/dev/null || true
       fi
