@@ -78,10 +78,10 @@ jobs:
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           cmake -S . -B build/core-only -DNETFT_CORE_ONLY=ON
           cmake --build build/core-only
-          registered_tests="$(ctest --test-dir build/core-only -N | sed -n 's/^Total Tests: //p')"
+          registered_tests="$(cd build/core-only && ctest -N | sed -n 's/^Total Tests: //p')"
           test -n "${registered_tests}"
           test "${registered_tests}" -gt 0
-          ctest --test-dir build/core-only --output-on-failure
+          (cd build/core-only && ctest --output-on-failure)
       - name: Run pure and package tests
         shell: bash
         run: |

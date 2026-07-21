@@ -1,7 +1,6 @@
 #include "netft_driver/client.hpp"
 
 #include <atomic>
-#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -12,6 +11,8 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <locale>
 #include <mutex>
 #include <optional>
 #include <sstream>
@@ -172,11 +173,12 @@ std::string json_string(const std::string & value) {
 
 std::string json_number(double value) {
   if (!std::isfinite(value)) throw std::runtime_error{"non-finite JSON value"};
-  char text[64];
-  const auto result = std::to_chars(std::begin(text), std::end(text), value,
-                                    std::chars_format::general);
-  if (result.ec != std::errc{}) throw std::runtime_error{"unable to serialize JSON number"};
-  return {text, result.ptr};
+  std::ostringstream output;
+  output.imbue(std::locale::classic());
+  output << std::setprecision(std::numeric_limits<double>::max_digits10)
+         << std::defaultfloat << value;
+  if (!output) throw std::runtime_error{"unable to serialize JSON number"};
+  return output.str();
 }
 
 std::string json_optional_sequence(const std::optional<std::uint32_t> & value) {
