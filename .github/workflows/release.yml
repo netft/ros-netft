@@ -56,6 +56,82 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Render release notes from the changelog
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          version = os.environ["RELEASE_VERSION"]
+          repository = os.environ["REPOSITORY"]
+          changelog = pathlib.Path("CHANGELOG.rst").read_text(encoding="utf-8")
+          section = re.search(
+              rf"(?ms)^{re.escape(version)} \([^\n]+\)\n-+\n(?P<body>.*?)(?=^[0-9]+\.[0-9]+\.[0-9]+ \(|\Z)",
+              changelog,
+          )
+          if section is None:
+              raise SystemExit(f"Could not extract the {version} changelog entry")
+
+          release_versions = re.findall(
+              r"(?m)^([0-9]+\.[0-9]+\.[0-9]+) \([^\n]+\)\n-+$", changelog
+          )
+          try:
+              previous_version = release_versions[release_versions.index(version) + 1]
+          except (ValueError, IndexError):
+              raise SystemExit(f"Could not determine the release preceding {version}")
+
+          bullets = []
+          current = None
+          contributors = None
+          for raw_line in section.group("body").splitlines():
+              line = raw_line.strip()
+              if line.startswith("* "):
+                  if current is not None:
+                      bullets.append(current)
+                  current = line[2:]
+              elif line and current is not None:
+                  current += " " + line
+          if current is not None:
+              bullets.append(current)
+
+          rendered = []
+          for bullet in bullets:
+              bullet = bullet.replace("``", "`")
+              if bullet.startswith("Contributors: "):
+                  contributors = bullet.removeprefix("Contributors: ").rstrip(".")
+              else:
+                  rendered.append(f"- {bullet}")
+
+          if not rendered:
+              raise SystemExit(f"The {version} changelog entry has no release notes")
+
+          notes = ["## Highlights", "", *rendered]
+          if contributors:
+              notes.extend(["", "## Contributors", "", contributors])
+          notes.extend(
+              [
+                  "",
+                  "## Availability",
+                  "",
+                  "This is a source release. ROS build-farm binaries are not yet available; "
+                  "follow the source installation instructions in the README.",
+                  "",
+                  f"**Full Changelog**: "
+                  f"https://github.com/{repository}/compare/{previous_version}...{version}",
+                  "",
+              ]
+          )
+          pathlib.Path(os.environ["RUNNER_TEMP"], "release-notes.md").write_text(
+              "\n".join(notes), encoding="utf-8"
+          )
+          PY
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -65,5 +141,5 @@ jobs:
           gh release create "${RELEASE_TAG}" \
             --repo "${REPOSITORY}" \
             --draft \
-            --generate-notes \
+            --notes-file "${RUNNER_TEMP}/release-notes.md" \
             --title "${RELEASE_TAG}"
