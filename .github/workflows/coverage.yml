@@ -40,6 +40,8 @@ jobs:
           gcovr \
             --root . \
             --filter 'src/' \
+            --exclude-throw-branches \
+            --exclude-unreachable-branches \
             --xml-pretty \
             --output coverage.xml \
             --print-summary \
