@@ -419,7 +419,7 @@ def test_native_ci_has_the_supported_source_matrix_without_release_claims():
     assert re.search(r"actions/checkout@[0-9a-f]{40} # v7", workflow)
     assert "cmake -S . -B build/core-only" in workflow
     assert "cmake --build build/core-only" in workflow
-    assert "ctest --test-dir build/core-only --output-on-failure" in workflow
+    assert "(cd build/core-only && ctest --output-on-failure)" in workflow
     assert "Total Tests:" in workflow
     assert "bash test/integration/ros1_smoke.sh" in workflow
     assert "bash test/integration/ros2_smoke.sh" in workflow
