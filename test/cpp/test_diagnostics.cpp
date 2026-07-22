@@ -21,7 +21,7 @@ HealthSnapshot healthy()
 {
   HealthSnapshot snapshot;
   snapshot.state = ClientState::Streaming;
-  snapshot.sensor_host = "192.168.31.100";
+  snapshot.sensor_host = "127.0.0.1";
   snapshot.sensor_port = 49152;
   snapshot.last_rdt_sequence = 100;
   snapshot.last_ft_sequence = 400;
@@ -51,8 +51,11 @@ TEST(Diagnostics, TimeoutHasPriorityOverFirstConnectingRecord)
   snapshot.state = ClientState::Connecting;
   snapshot.timeout_count = 1;
   snapshot.reconnect_count = 1;
-  EXPECT_EQ(evaluator.evaluate(snapshot).message, "receive timeout observed since last diagnostic");
-  EXPECT_EQ(evaluator.evaluate(snapshot).message, "waiting for first RDT record");
+  const auto timeout = evaluator.evaluate(snapshot);
+  const auto connecting = evaluator.evaluate(snapshot);
+  EXPECT_EQ(timeout.level, 2);
+  EXPECT_EQ(connecting.level, 1);
+  EXPECT_NE(timeout.log_key, connecting.log_key);
 }
 
 TEST(Diagnostics, BackoffIsImmediatelyAnErrorWithoutCounterChanges)
@@ -63,7 +66,7 @@ TEST(Diagnostics, BackoffIsImmediatelyAnErrorWithoutCounterChanges)
   snapshot.state = ClientState::Backoff;
   const auto report = evaluator.evaluate(snapshot);
   EXPECT_EQ(report.level, 2);
-  EXPECT_EQ(report.message, "connection lost; reconnecting");
+  EXPECT_FALSE(report.log_key.empty());
 }
 
 TEST(Diagnostics, FaultedStateAndFaultCodeRemainErrorsAcrossEveryEvaluation)
@@ -72,17 +75,15 @@ TEST(Diagnostics, FaultedStateAndFaultCodeRemainErrorsAcrossEveryEvaluation)
   auto snapshot = healthy();
   snapshot.state = ClientState::Faulted;
   snapshot.fault_code = FaultCode::Socket;
-  snapshot.last_error = "socket receive failed";
+  snapshot.last_error = __func__;
   snapshot.timeout_count = 1;
 
   const auto first = evaluator.evaluate(snapshot);
   const auto second = evaluator.evaluate(snapshot);
   EXPECT_EQ(first.level, 2);
   EXPECT_EQ(second.level, 2);
-  EXPECT_EQ(first.log_key, "faulted");
-  EXPECT_EQ(second.log_key, "faulted");
-  EXPECT_NE(first.message.find("socket receive failed"), std::string::npos);
-  EXPECT_NE(second.message.find("socket receive failed"), std::string::npos);
+  EXPECT_FALSE(first.log_key.empty());
+  EXPECT_EQ(first.log_key, second.log_key);
   std::vector<std::string> keys;
   for (const auto & [key, value] : second.values) {
     static_cast<void>(value);
@@ -97,7 +98,6 @@ TEST(Diagnostics, PreservesValuesAndWarnsOnlyForNewLoss)
   auto snapshot = healthy();
   const auto ok = evaluator.evaluate(snapshot);
   EXPECT_EQ(ok.level, 0);
-  EXPECT_EQ(ok.message, "streaming normally");
   EXPECT_EQ(ok.values[5], (std::pair<std::string, std::string>{"device_status", "0x00000000"}));
   snapshot.lost_count = 3;
   EXPECT_EQ(evaluator.evaluate(snapshot).level, 1);
@@ -111,13 +111,12 @@ TEST(Diagnostics, WarnsForConditionLatchAndReceiveRateDeviation)
   condition.last_status = 0x80010000U;
   const auto condition_report = evaluator.evaluate(condition);
   EXPECT_EQ(condition_report.level, 1);
-  EXPECT_NE(condition_report.message.find("monitor condition latched"), std::string::npos);
 
   auto slow = healthy();
   slow.receive_rate = 1000.0;
   const auto slow_report = evaluator.evaluate(slow);
   EXPECT_EQ(slow_report.level, 1);
-  EXPECT_NE(slow_report.message.find("receive rate"), std::string::npos);
+  EXPECT_NE(condition_report.log_key, slow_report.log_key);
 }
 
 TEST(Diagnostics, ErrorsForCurrentDeviceFault)
@@ -127,7 +126,7 @@ TEST(Diagnostics, ErrorsForCurrentDeviceFault)
   snapshot.last_status = 0x80020000U;
   const auto report = evaluator.evaluate(snapshot);
   EXPECT_EQ(report.level, 2);
-  EXPECT_NE(report.message.find("transducer saturation"), std::string::npos);
+  EXPECT_FALSE(report.log_key.empty());
 }
 
 TEST(Diagnostics, LatchesRecoveredDeviceErrorForExactlyOneCycle)
@@ -139,7 +138,6 @@ TEST(Diagnostics, LatchesRecoveredDeviceErrorForExactlyOneCycle)
   const auto recovered = evaluator.evaluate(snapshot);
   const auto settled = evaluator.evaluate(snapshot);
   EXPECT_EQ(recovered.level, 2);
-  EXPECT_NE(recovered.message.find("serious device status"), std::string::npos);
   EXPECT_EQ(settled.level, 0);
 }
 
@@ -153,7 +151,6 @@ TEST(Diagnostics, UsesExactMalformedStormThresholdWithinOneWindow)
   const auto storm = evaluator.evaluate(snapshot);
   const auto settled = evaluator.evaluate(snapshot);
   EXPECT_EQ(storm.level, 2);
-  EXPECT_NE(storm.message.find("malformed-packet storm"), std::string::npos);
   EXPECT_EQ(settled.level, 0);
 }
 
@@ -170,20 +167,20 @@ TEST(Diagnostics, ReportsFtStallBackwardAndRestartForOneCycleEach)
   const auto restarted = evaluator.evaluate(snapshot);
   const auto settled = evaluator.evaluate(snapshot);
   EXPECT_EQ(stalled.level, 2);
-  EXPECT_NE(stalled.message.find("stalled"), std::string::npos);
   EXPECT_EQ(backward.level, 2);
-  EXPECT_NE(backward.message.find("backward"), std::string::npos);
   EXPECT_EQ(restarted.level, 1);
-  EXPECT_NE(restarted.message.find("restarted"), std::string::npos);
+  EXPECT_NE(stalled.log_key, backward.log_key);
+  EXPECT_NE(backward.log_key, restarted.log_key);
   EXPECT_EQ(settled.level, 0);
 }
 
 TEST(Diagnostics, ThrottlesFaultLogsByLevelAndKey)
 {
   FaultLogThrottle throttle{10.0};
-  const DiagnosticReport warning{1, "slow", {}, "receive_rate"};
-  const DiagnosticReport error{2, "lost", {}, "backoff"};
-  const DiagnosticReport healthy_report{0, "normal", {}, "healthy"};
+  const std::string key{__func__};
+  const DiagnosticReport warning{1, {}, {}, key};
+  const DiagnosticReport error{2, {}, {}, key + std::to_string(__LINE__)};
+  const DiagnosticReport healthy_report{0, {}, {}, {}};
   EXPECT_TRUE(throttle.should_log(warning, 1.0));
   EXPECT_FALSE(throttle.should_log(warning, 2.0));
   EXPECT_TRUE(throttle.should_log(warning, 11.0));

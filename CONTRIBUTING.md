@@ -43,6 +43,12 @@ The available Pixi environments are `noetic`, `humble`, `jazzy`, `kilted`,
 `lyrical`, and `rolling`. Native ROS installations may also be used; CI runs
 the complete supported source matrix.
 
+Tests should verify executable behavior, protocol rules, ROS graph contracts,
+machine-readable output, or build metadata. Do not pin README, changelog,
+release-note, help, diagnostic, log, or error prose. Protocol bytes, serialized
+values, JSON keys, ROS interface names, and other machine-readable contracts
+remain valid test inputs and assertions.
+
 ## Pull requests
 
 Before opening a pull request:

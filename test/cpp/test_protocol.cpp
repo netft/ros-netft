@@ -71,12 +71,7 @@ class InvalidDatagramSize : public ::testing::TestWithParam<std::size_t> {};
 TEST_P(InvalidDatagramSize, RejectsEveryNonRdtLength)
 {
   const std::vector<std::uint8_t> payload(GetParam());
-  try {
-    static_cast<void>(decode_record(payload.data(), payload.size()));
-    FAIL() << "malformed payload was accepted";
-  } catch (const ProtocolError & error) {
-    EXPECT_NE(std::string{error.what()}.find("exactly 36 bytes"), std::string::npos);
-  }
+  EXPECT_THROW(static_cast<void>(decode_record(payload.data(), payload.size())), ProtocolError);
 }
 INSTANTIATE_TEST_SUITE_P(Protocol, InvalidDatagramSize, ::testing::Values(0, 7, 35, 37, 72));
 

@@ -2,6 +2,16 @@
 Changelog for package netft_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.2 (2026-07-22)
+------------------
+* Replace the project-specific sensor address in defaults and examples with
+  ATI's factory-default ``192.168.1.1`` address.
+* Keep tests focused on executable and machine-readable contracts instead of
+  human-facing documentation, help, error, log, and diagnostic wording.
+* Normalize generated release notes and remove the obsolete source-only
+  availability notice.
+* Contributors: Xudong Han
+
 0.2.1 (2026-07-22)
 ------------------
 * Fix ROS version detection when isolated build environments do not expose
