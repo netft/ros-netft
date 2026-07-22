@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.16)
 project(netft_driver)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -8,6 +8,33 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(NETFT_CORE_ONLY "Build only the ROS-neutral C++ core" OFF)
 option(NETFT_INSTALL_TEST_TOOLS "Install private integration-test tools" OFF)
 
+find_package(Threads REQUIRED)
+find_package(CURL 7.62 REQUIRED)
+
+set(NETFT_SNAPSHOT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/core")
+set(NETFT_SNAPSHOT_SOURCES
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/types.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/status.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/discovery.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/client.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/client_impl.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/fault_latch.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/posix_transport.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/protocol.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/sequence.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/xml_config.cpp
+)
+
+add_library(netft_sdk_core STATIC ${NETFT_SNAPSHOT_SOURCES})
+set_target_properties(netft_sdk_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(netft_sdk_core PUBLIC cxx_std_17)
+target_compile_definitions(netft_sdk_core PRIVATE NETFT_BUILDING_LIBRARY)
+target_include_directories(netft_sdk_core
+  PUBLIC ${NETFT_SNAPSHOT_SOURCE_DIR}/include
+  PRIVATE ${NETFT_SNAPSHOT_SOURCE_DIR}/src
+)
+target_link_libraries(netft_sdk_core PUBLIC Threads::Threads CURL::libcurl)
+
 add_library(netft_core STATIC src/protocol.cpp src/status.cpp src/client.cpp)
 set_target_properties(netft_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(netft_core PUBLIC cxx_std_17)
@@ -16,12 +43,12 @@ target_include_directories(netft_core PUBLIC
 )
 
 add_executable(netft_check src/check_main.cpp)
-find_package(Threads REQUIRED)
 target_link_libraries(netft_check PRIVATE netft_core Threads::Threads)
 
 if(NETFT_CORE_ONLY)
   enable_testing()
   find_package(GTest REQUIRED)
+  add_subdirectory(test/core)
   add_subdirectory(test/cpp)
   return()
 endif()
