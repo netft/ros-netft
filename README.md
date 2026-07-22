@@ -68,7 +68,7 @@ source devel/setup.bash
 ATI RDT permits one UDP client. Stop the ATI Java demo and every other RDT
 client before starting this driver.
 
-The examples use ATI's [factory-default sensor address](https://www.ati-ia.com/app_content/Documents/9620-05-Net%20FT.pdf), `192.168.1.1`. Replace it with the address configured for your sensor when it has been moved to another network.
+The examples use ATI's [factory-default static address](https://www.ati-ia.com/app_content/Documents/9620-05-Net%20FT.pdf), `192.168.1.1`. A sensor configured for DHCP uses its network-assigned address when available and falls back to its static settings when DHCP is unavailable. Replace the example address with the address currently assigned to your sensor.
 
 ### Standalone driver
 
