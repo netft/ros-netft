@@ -16,6 +16,7 @@ def test_manifest_has_conditional_ros_build_types_and_dependencies():
     }
     assert ("buildtool_depend", "catkin", "$ROS_VERSION == 1") in dependencies
     assert ("buildtool_depend", "ament_cmake", "$ROS_VERSION == 2") in dependencies
+    assert ("buildtool_depend", "ros_environment", None) in dependencies
     assert ("build_depend", "ament_cmake_python", "$ROS_VERSION == 2") not in dependencies
     assert ("exec_depend", "rospy", "$ROS_VERSION == 1") not in dependencies
     assert ("exec_depend", "rclpy", "$ROS_VERSION == 2") not in dependencies
