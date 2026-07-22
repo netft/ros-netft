@@ -35,6 +35,14 @@ target_include_directories(netft_sdk_core
 )
 target_link_libraries(netft_sdk_core PUBLIC Threads::Threads CURL::libcurl)
 
+add_library(netft_ros_support STATIC src/ros/unit_conversion.cpp)
+set_target_properties(netft_ros_support PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(netft_ros_support PUBLIC cxx_std_17)
+target_include_directories(netft_ros_support
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
+  PRIVATE ${NETFT_SNAPSHOT_SOURCE_DIR}/include)
+target_link_libraries(netft_ros_support PUBLIC netft_sdk_core)
+
 add_library(netft_core STATIC src/protocol.cpp src/status.cpp src/client.cpp)
 set_target_properties(netft_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(netft_core PUBLIC cxx_std_17)

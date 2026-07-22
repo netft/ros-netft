@@ -31,3 +31,11 @@ add_test(NAME netft_check COMMAND netft_check_test)
 add_executable(netft_adapter_config test_adapter_config.cpp)
 target_link_libraries(netft_adapter_config PRIVATE netft_core GTest::gtest_main)
 add_test(NAME netft_adapter_config COMMAND netft_adapter_config)
+
+add_executable(netft_unit_conversion test_unit_conversion.cpp)
+target_include_directories(netft_unit_conversion PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+target_link_libraries(netft_unit_conversion PRIVATE
+  netft_ros_support
+  netft_sdk_core
+  GTest::gtest_main)
+add_test(NAME netft_unit_conversion COMMAND netft_unit_conversion)
