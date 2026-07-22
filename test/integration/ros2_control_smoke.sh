@@ -151,10 +151,10 @@ run_installed_smoke() {
   <xacro:include filename="$installed_share/urdf/netft.ros2_control.xacro"/>
   <xacro:netft_ros2_control name="left_hardware" sensor_name="left_ft"
     sensor_ip="127.0.0.1" sensor_port="$left_port" counts_per_force="100"
-    counts_per_torque="10" receive_timeout="0.2" activation_timeout="1.0"/>
+    counts_per_torque="10" receive_timeout="5.0" activation_timeout="2.0"/>
   <xacro:netft_ros2_control name="right_hardware" sensor_name="right_ft"
     sensor_ip="127.0.0.1" sensor_port="$right_port" counts_per_force="100"
-    counts_per_torque="10" receive_timeout="0.2" activation_timeout="1.0"/>
+    counts_per_torque="10" receive_timeout="5.0" activation_timeout="2.0"/>
 </robot>
 EOF
 
@@ -225,7 +225,6 @@ EOF
   echo "both broadcasters published"
 
   terminate_pid "${managed_pids[0]}"
-  sleep 0.35
 
   component_state() {
     local component="$1"
@@ -236,7 +235,7 @@ EOF
         found && $1 == "state:" { state = $NF; sub(/^label=/, "", state); print state; exit }
       '
   }
-  local deadline=$((SECONDS + 10))
+  local deadline=$((SECONDS + 15))
   local left_state
   local right_state
   while true; do

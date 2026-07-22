@@ -2,6 +2,16 @@
 Changelog for package netft_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.1 (2026-07-22)
+------------------
+* Fix ROS version detection when isolated build environments do not expose
+  ``ROS_VERSION`` to CMake.
+* Declare the ``ros_environment`` build dependency and validate ROS 1 and ROS 2
+  configuration with ``ROS_VERSION`` unset.
+* Increase the ros2_control smoke-test timeout margin so transient CI scheduler
+  stalls do not fault the healthy sensor in the two-sensor isolation scenario.
+* Contributors: Xudong Han
+
 0.2.0 (2026-07-21)
 ------------------
 * Replace the sensor runtime with one ROS-neutral C++17 transport, protocol,

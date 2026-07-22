@@ -21,11 +21,14 @@ def _pixi_workspace_version():
 
 def test_release_versions_are_identical():
     manifest_version = _manifest_root().findtext("version")
-    assert manifest_version == "0.2.0"
+    assert manifest_version == "0.2.1"
     assert _pixi_workspace_version() == manifest_version
     changelog = (ROOT / "CHANGELOG.rst").read_text(encoding="utf-8")
+    assert "0.2.1 (2026-07-22)" in changelog
     assert "0.2.0 (2026-07-21)" in changelog
-    assert changelog.index("0.2.0 (2026-07-21)") < changelog.index("0.1.0 (2026-07-19)")
+    assert changelog.index("0.2.1 (2026-07-22)") < changelog.index(
+        "0.2.0 (2026-07-21)"
+    )
 
 
 def test_readme_documents_the_standalone_and_ros2_control_contracts():

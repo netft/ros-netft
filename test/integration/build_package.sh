@@ -16,6 +16,11 @@ trap cleanup EXIT
 mkdir -p "$temp_root/ws/src"
 ln -s "$repo_root" "$temp_root/ws/src/netft_driver"
 
+env -u ROS_VERSION cmake \
+  -S "$repo_root" \
+  -B "$temp_root/ros-version-autodetect" \
+  -DBUILD_TESTING=OFF
+
 assert_native_install() {
   local install_root="$1"
   local ros_version="$2"
