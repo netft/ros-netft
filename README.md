@@ -68,12 +68,14 @@ source devel/setup.bash
 ATI RDT permits one UDP client. Stop the ATI Java demo and every other RDT
 client before starting this driver.
 
+The examples use ATI's [factory-default static address](https://www.ati-ia.com/app_content/Documents/9620-05-Net%20FT.pdf), `192.168.1.1`. A sensor configured for DHCP uses its network-assigned address when available and falls back to its static settings when DHCP is unavailable. Replace the example address with the address currently assigned to your sensor.
+
 ### Standalone driver
 
 Launch ROS 2:
 
 ```bash
-ros2 launch netft_driver netft.launch.py sensor_ip:=192.168.31.100 sensor_port:=49152
+ros2 launch netft_driver netft.launch.py sensor_ip:=192.168.1.1 sensor_port:=49152
 ros2 topic echo --once /netft/wrench
 ros2 topic echo --once /diagnostics
 ```
@@ -81,7 +83,7 @@ ros2 topic echo --once /diagnostics
 Launch ROS 1:
 
 ```bash
-roslaunch netft_driver netft.launch sensor_ip:=192.168.31.100 sensor_port:=49152
+roslaunch netft_driver netft.launch sensor_ip:=192.168.1.1 sensor_port:=49152
 rostopic echo -n 1 /netft/wrench
 rostopic echo -n 1 /diagnostics
 ```
@@ -90,10 +92,10 @@ Run a bounded, non-biasing endpoint check without starting a ROS graph:
 
 ```bash
 # ROS 2
-ros2 run netft_driver netft_check --host 192.168.31.100 --duration 5
+ros2 run netft_driver netft_check --host 192.168.1.1 --duration 5
 
 # ROS 1
-rosrun netft_driver netft_check --host 192.168.31.100 --duration 5
+rosrun netft_driver netft_check --host 192.168.1.1 --duration 5
 ```
 
 ### ros2_control integration
@@ -107,7 +109,7 @@ managed by your controller manager:
 <xacro:netft_ros2_control
   name="wrist_netft_hardware"
   sensor_name="wrist_ft"
-  sensor_ip="192.168.31.100"
+  sensor_ip="192.168.1.1"
   sensor_port="49152"
   receive_timeout="0.1"
   activation_timeout="2.0"/>
@@ -219,7 +221,7 @@ unless `publish_on_error=true`.
 
 | Parameter | Default | Meaning |
 |---|---:|---|
-| `sensor_ip` | `192.168.31.100` | Sensor IPv4 address or host |
+| `sensor_ip` | `192.168.1.1` | Sensor IPv4 address or host |
 | `sensor_port` | `49152` | RDT UDP port |
 | `frame_id` | `netft_link` | Wrench header frame |
 | `wrench_topic` | `/netft/wrench` | Output topic |

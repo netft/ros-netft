@@ -10,7 +10,7 @@
 namespace netft_driver {
 
 struct AdapterParameters {
-  std::string sensor_ip{"192.168.31.100"};
+  std::string sensor_ip{"192.168.1.1"};
   int sensor_port{49152};
   std::string frame_id{"netft_link"};
   std::string wrench_topic{"/netft/wrench"};

@@ -1,6 +1,6 @@
 netft:
   ros__parameters:
-    sensor_ip: 192.168.31.100
+    sensor_ip: 192.168.1.1
     sensor_port: 49152
     frame_id: netft_link
     wrench_topic: /netft/wrench

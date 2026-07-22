@@ -16,7 +16,7 @@ enum class FaultCode { None, Timeout, Socket, SeriousStatus, FtStall,
                        FtBackward, MalformedStorm, Callback };
 
 struct ClientConfig {
-  std::string sensor_host{"192.168.31.100"};
+  std::string sensor_host{"192.168.1.1"};
   int sensor_port{49152};
   double counts_per_force{1000000.0};
   double counts_per_torque{1000000.0};

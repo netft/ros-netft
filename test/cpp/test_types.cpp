@@ -11,7 +11,7 @@ namespace {
 TEST(ClientConfig, KeepsPublishedDefaults)
 {
   const netft_driver::ClientConfig config{};
-  EXPECT_EQ(config.sensor_host, "192.168.31.100");
+  EXPECT_EQ(config.sensor_host, "192.168.1.1");
   EXPECT_EQ(config.sensor_port, 49152);
   EXPECT_DOUBLE_EQ(config.counts_per_force, 1000000.0);
   EXPECT_DOUBLE_EQ(config.counts_per_torque, 1000000.0);

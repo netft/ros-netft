@@ -118,11 +118,6 @@ jobs:
           notes.extend(
               [
                   "",
-                  "## Availability",
-                  "",
-                  "This is a source release. ROS build-farm binaries are not yet available; "
-                  "follow the source installation instructions in the README.",
-                  "",
                   f"**Full Changelog**: "
                   f"https://github.com/{repository}/compare/{previous_version}...{version}",
                   "",

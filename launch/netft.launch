@@ -1,5 +1,5 @@
 <launch>
-  <arg name="sensor_ip" default="192.168.31.100"/>
+  <arg name="sensor_ip" default="192.168.1.1"/>
   <arg name="sensor_port" default="49152"/>
   <node pkg="netft_driver" type="netft_node" name="netft" output="screen">
     <rosparam command="load" file="$(find netft_driver)/config/netft_ros1.yaml"/>

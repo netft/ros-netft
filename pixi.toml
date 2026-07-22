@@ -2,7 +2,7 @@
 
 [workspace]
 name = "ros-netft"
-version = "0.2.1"
+version = "0.2.2"
 description = "Native ROS 1, ROS 2, and ros2_control driver for ATI Net F/T RDT sensors"
 channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64"]

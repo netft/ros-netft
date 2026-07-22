@@ -13,7 +13,7 @@ def generate_launch_description():
     )
     return LaunchDescription(
         [
-            DeclareLaunchArgument("sensor_ip", default_value="192.168.31.100"),
+            DeclareLaunchArgument("sensor_ip", default_value="192.168.1.1"),
             DeclareLaunchArgument("sensor_port", default_value="49152"),
             Node(
                 package="netft_driver",

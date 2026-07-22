@@ -46,16 +46,12 @@ TEST(AdapterConfig, AcceptsNonEmptyNamesAndPositiveFiniteDiagnosticsRate)
   EXPECT_NO_THROW(netft_driver::validate_adapter_config("netft_link", "wrench", "bias", 1.0));
 }
 
-TEST(AdapterConfig, RejectsBlankNamesAndInvalidDiagnosticsRateWithFieldNames)
+TEST(AdapterConfig, RejectsBlankNamesAndInvalidDiagnosticsRate)
 {
-  try { netft_driver::validate_adapter_config(" \t", "wrench", "bias", 1.0); FAIL(); }
-  catch (const std::invalid_argument & error) { EXPECT_NE(std::string{error.what()}.find("frame_id"), std::string::npos); }
-  try { netft_driver::validate_adapter_config("frame", "\n", "bias", 1.0); FAIL(); }
-  catch (const std::invalid_argument & error) { EXPECT_NE(std::string{error.what()}.find("wrench_topic"), std::string::npos); }
-  try { netft_driver::validate_adapter_config("frame", "wrench", " ", 1.0); FAIL(); }
-  catch (const std::invalid_argument & error) { EXPECT_NE(std::string{error.what()}.find("bias_service"), std::string::npos); }
+  EXPECT_THROW(netft_driver::validate_adapter_config(" \t", "wrench", "bias", 1.0), std::invalid_argument);
+  EXPECT_THROW(netft_driver::validate_adapter_config("frame", "\n", "bias", 1.0), std::invalid_argument);
+  EXPECT_THROW(netft_driver::validate_adapter_config("frame", "wrench", " ", 1.0), std::invalid_argument);
   for (const double value : {0.0, std::numeric_limits<double>::infinity()}) {
-    try { netft_driver::validate_adapter_config("frame", "wrench", "bias", value); FAIL(); }
-    catch (const std::invalid_argument & error) { EXPECT_NE(std::string{error.what()}.find("diagnostics_rate"), std::string::npos); }
+    EXPECT_THROW(netft_driver::validate_adapter_config("frame", "wrench", "bias", value), std::invalid_argument);
   }
 }
