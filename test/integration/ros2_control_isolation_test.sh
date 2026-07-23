@@ -130,15 +130,15 @@ wait_control_run() {
 }
 
 domain_from_log() {
-  sed -n 's/^ROS 2 control smoke leased domain: \([0-9][0-9]*\)$/\1/p' "$1"
+  sed -n 's/^netft_control_domain=\([0-9][0-9]*\)$/\1/p' "$1"
 }
 
 assert_run_output() {
   local log="$1"
-  grep -Fxq 'both broadcasters published' "$log"
-  grep -Fxq 'post-fault hardware states: left=unconfigured right=active' "$log"
-  grep -Fxq 'right broadcaster published a new wrench after left timeout' "$log"
-  grep -Fxq 'ros2_control two-instance smoke passed' "$log"
+  grep -Fxq 'netft_control_event=publish_ready' "$log"
+  grep -Fxq 'netft_control_state=left:unconfigured,right:active' "$log"
+  grep -Fxq 'netft_control_event=right_survived' "$log"
+  grep -Fxq 'netft_control_result=pass' "$log"
 }
 
 assert_domain_has_no_daemon() {
@@ -217,7 +217,7 @@ main() {
   assert_run_output "$test_root/b.log"
   assert_domain_has_no_daemon "$domain_a"
   assert_domain_has_no_daemon "$domain_b"
-  echo "ROS 2 control smoke isolation checks passed: single=$single_domain concurrent=$domain_a,$domain_b"
+  echo "netft_control_isolation=pass single=$single_domain concurrent=$domain_a,$domain_b"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

@@ -23,7 +23,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Install coverage dependencies
-        run: sudo apt-get update && sudo apt-get install -y gcovr libgtest-dev
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          gcovr libcurl4-openssl-dev libgtest-dev
       - name: Configure coverage build
         run: >-
           cmake -S . -B build/coverage

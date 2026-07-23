@@ -66,6 +66,18 @@ Before opening a pull request:
 Open an issue before starting a large feature or an interface-breaking change
 so the scope can be agreed upon first.
 
+## Core snapshot updates
+
+1. Update and release `netft-cpp` first.
+2. Copy only the library paths from an immutable upstream tag.
+3. Preserve the `netft` namespace and the Apache-2.0 license.
+4. Update `src/core/UPSTREAM` with the copied tag and commit.
+5. Keep the Apache-2.0 `src/compat/xml_config.cpp` fallback synchronized with the copied upstream XML parser.
+6. Rerun the byte comparison and every snapshot and ROS test.
+7. Keep ROS-specific changes out of `src/core/`; port reusable fixes upstream before copying them back.
+
+Do not add an automated downloader or submodule for the core snapshot.
+
 ## Physical sensor safety
 
 The automated test suite does not require a physical sensor. Do not perform
@@ -80,5 +92,8 @@ issued. Do not publish private network details or sensor identifiers.
 
 ## License
 
-By contributing, you agree that your contribution is licensed under the
-repository's [MIT License](LICENSE).
+Contributions are licensed under the repository's
+[Apache-2.0 License](LICENSE). The copied `src/core/` snapshot retains the
+upstream license copy at [src/core/LICENSE](src/core/LICENSE). Propose reusable
+core fixes upstream first, then copy them from a released immutable upstream
+revision and update the fallback when the XML parser changes.

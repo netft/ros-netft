@@ -6,31 +6,34 @@ operator procedures, and safety guidance.
 
 ## Package boundaries
 
-The package contains one ROS-neutral C++17 core and three adapters:
+The active transport implementation is a private snapshot of netft-cpp under `src/core`. It is built as `netft_core`, uses the `netft` namespace, contains no ROS headers, and is not installed as a public SDK. When the C++ standard library lacks floating-point `std::from_chars`, CMake substitutes the Apache-2.0 `src/compat/xml_config.cpp` translation unit for the snapshot XML parser. `netft::Client` is the single client used by the command-line tool, standalone nodes, and ros2_control plugin.
 
 ```text
-netft_core
-├── src/protocol.cpp          RDT wire encoding and decoding
-├── src/status.cpp            status, sequence, and diagnostic policy
-└── src/client.cpp            UDP transport, acquisition, and recovery
+src/core sources
+└── netft_core
+    └── netft_ros_support
+        ├── netft_check
+        ├── netft_node (ROS 1 or ROS 2)
+        └── netft_ros2_control (ROS 2 only)
 
-src/check_main.cpp            bounded command-line endpoint check
-src/ros1_node.cpp             roscpp standalone adapter
-src/ros2_node.cpp             rclcpp standalone adapter
+src/ros/unit_conversion.cpp   native engineering units to N and Nm
+src/ros/diagnostics.cpp       ROS-facing health evaluation
 src/netft_hardware_interface.cpp
-                              ros2_control SensorInterface plugin
+                              ros2_control SensorInterface implementation
 ```
 
-`netft_core` contains no ROS headers and owns the single transport and fault
-implementation used by every adapter. The build selects either the ROS 1 or
-ROS 2 standalone adapter and installs it as `netft_node`. `netft_check` is a
-native executable that performs a bounded acquisition without ROS graph
-traffic or a software-bias command.
+`netft_ros_support` is the boundary between the private snapshot and the adapters. It owns SI conversion and ROS-facing diagnostic interpretation but no transport. The build selects either the ROS 1 or ROS 2 standalone adapter and installs it as `netft_node`. `netft_check` performs a bounded acquisition without ROS graph traffic or a software-bias command.
 
-The ROS 2 build additionally exports
-`netft_driver/NetFTHardwareInterface` through `netft_hardware_plugins.xml`.
-The plugin is one consumer of a robot's existing controller manager; it does
-not implement a controller or require a second controller manager.
+`netft_core`, `netft_ros_support`, and their headers remain private and are not
+installed. The ROS 2 build installs the uninstrumented
+`netft_ros2_control` plugin as `netft_driver/NetFTHardwareInterface` through
+`netft_hardware_plugins.xml`; core and support archive symbols are localized
+at that DSO boundary. When tests are enabled, a separate non-installed
+`netft_ros2_control_testing` plugin is compiled with private hooks and loaded
+through a build-tree-only plugin index; the production plugin is never
+compiled with those hooks.
+
+The plugin is one consumer of a robot's existing controller manager; it does not implement a controller or require a second controller manager.
 
 ## Protocol and transport core
 
@@ -39,12 +42,9 @@ Records contain the RDT sequence, FT sequence, device status, three signed
 force counts, and three signed torque counts. All fields use network byte
 order, and force and torque use independent counts-per-unit scales.
 
-`src/protocol.cpp` owns exact request construction and 36-byte record parsing.
-`src/status.cpp` owns device-status classification, unsigned 32-bit RDT
-sequence comparison, FT progress and restart confirmation, diagnostic report
-construction, and bounded fault-log throttling. `src/client.cpp` owns endpoint
-resolution, the UDP socket, streaming commands, the receiver thread, unit
-conversion, health counters, and the latest complete sample.
+Within the private snapshot, `src/core/src/detail/protocol.cpp` owns exact request construction and 36-byte record parsing, the sequence and fault-latch components own RDT/FT progress and first-fault semantics, and `src/core/src/detail/posix_transport.cpp` owns the UDP transport. `netft::Client` is the public face of the snapshot: it fetches sensor calibration over HTTP unless an override is supplied, manages streaming and recovery, converts counts to the sensor's declared engineering units, invokes the sample callback, and exposes an immutable health snapshot.
+
+The snapshot deliberately stops at native engineering units. `netft::Sample` carries both scaled values and force/torque unit tags. `netft_driver::to_si_sample()` in `netft_ros_support` is the adapter boundary that converts those values to newtons and newton-metres.
 
 ATI RDT permits one active UDP client. The driver sends only Start Streaming,
 Stop Streaming, and an explicitly requested Software Bias command; it does
@@ -53,19 +53,9 @@ settings.
 
 ## Acquisition and threading
 
-`NetFTClient::start()` creates one receiver thread. That thread owns blocking
-UDP receive activity, decodes complete datagrams, classifies sequence and
-device state, updates the health snapshot, and invokes the adapter callback
-for accepted samples. Shutdown closes the socket to wake blocked receive,
-joins the worker, and sends Stop Streaming when possible.
+`netft::Client::start()` creates one receiver thread. That thread owns blocking UDP receive activity, decodes complete datagrams, classifies sequence and device state, updates the health snapshot, and invokes the adapter callback for accepted samples. Shutdown closes the socket to wake blocked receive, joins the worker, and sends Stop Streaming when possible.
 
-Standalone adapters publish from the receiver callback and keep ROS timers,
-services, logging, and message conversion outside the core. The plugin's
-receiver callback writes complete samples into
-`realtime_tools::RealtimeBuffer<WrenchSample>`. Its controller-loop `read()`
-uses `RealtimeBuffer::readFromRT()` and performs no network I/O, reconnect,
-service work, or unbounded mutex wait. A controller loop may consume the same
-current sample more than once when it runs faster than the sensor stream.
+Standalone adapters convert each callback sample through the support layer before publishing and keep ROS timers, services, logging, and message construction outside the snapshot. The plugin's receiver callback also immediately converts each accepted native-unit sample to SI and writes the result into `realtime_tools::RealtimeBuffer<SiSample>`. Its controller-loop `read()` uses `RealtimeBuffer::readFromRT()`, copies SI values only, and performs no unit conversion, network I/O, reconnect, service work, or unbounded mutex wait. A controller loop may consume the same current sample more than once when it runs faster than the sensor stream.
 
 This separation is control-loop-friendly, but it is not an end-to-end
 hard-real-time guarantee: UDP transport, Linux scheduling, controller code,
@@ -187,22 +177,18 @@ The package uses one format-3 manifest with ROS-version conditions. ROS 1 uses
 catkin and roscpp. ROS 2 uses ament_cmake, rclcpp, hardware_interface,
 pluginlib, and realtime_tools.
 
-`include/netft_driver/ros2_control_compat.hpp` isolates the ros2_control API
-difference. Hardware-interface major versions below 4 use the legacy exported
-state-interface path required by Humble; version 4 and later use
-framework-managed state interfaces. CMake selects this at compile time from
-the discovered `hardware_interface` version. Transport and fault semantics do
-not branch on a ROS distribution name.
+The private `src/ros/ros2_control_compat.hpp` isolates the ros2_control API
+difference, while private test-access declarations stay in
+`src/ros/ros2_control_test_access.hpp`; neither header is installed. Hardware-
+interface major versions below 4 use the legacy exported state-interface path
+required by Humble; version 4 and later use framework-managed state interfaces.
+CMake selects this at compile time from the discovered `hardware_interface`
+version. Transport and fault semantics do not branch on a ROS distribution
+name.
 
 ## Test boundaries
 
-The ROS-neutral CTest suite builds `netft_core` without ROS and uses GTest for
-protocol bytes, record parsing, status and sequence semantics, diagnostics,
-parameter validation, client recovery, shutdown, and the bounded check tool.
-ROS package GTests cover the native ROS adapters and the hardware plugin,
-including invalid descriptions, activation, non-blocking reads, every fatal
-class, persistent latching, lifecycle recovery, online bias, and auxiliary
-thread cleanup.
+The ROS-neutral CTest suite builds `netft_core` and `netft_ros_support` without ROS and uses GTest for protocol bytes, XML calibration, record parsing, status and sequence semantics, SI conversion, parameter validation, client recovery, shutdown, and the bounded check tool. ROS package GTests cover the native ROS adapters and load the non-installed instrumented hardware plugin, including invalid descriptions, activation, non-blocking reads, every fatal class, persistent latching, lifecycle quiescence and recovery, online bias, and auxiliary-thread cleanup. Installed-package smoke tests load only the production plugin.
 
 Loopback graph smoke tests build and use the installed package. They verify
 standalone topics, services, diagnostics, shutdown, plugin loading, the

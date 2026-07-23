@@ -227,6 +227,7 @@ run_full_graph_scenario() {
   local scenario_root="$1"
   local domain="$2"
   local sensor_port
+  local http_port
   local group_id
   local node_status
 
@@ -236,27 +237,32 @@ run_full_graph_scenario() {
   PYTHONPATH="$repo_root" python3 \
     "$repo_root/test/integration/fake_sensor_process.py" \
     --port-file "$scenario_root/sensor.port" \
+    --http-port-file "$scenario_root/http.port" \
     --commands-file "$scenario_root/commands.json" \
     --rate 200 >"$scenario_root/sensor.log" 2>&1 &
   sensor_pid=$!
   for _ in $(seq 1 100); do
-    [[ -s "$scenario_root/sensor.port" ]] && break
+    [[ -s "$scenario_root/sensor.port" && -s "$scenario_root/http.port" ]] && break
     kill -0 "$sensor_pid" 2>/dev/null || break
     sleep 0.05
   done
-  if [[ ! -s "$scenario_root/sensor.port" ]]; then
+  if [[ ! -s "$scenario_root/sensor.port" || ! -s "$scenario_root/http.port" ]]; then
     cat "$scenario_root/sensor.log" >&2
     return 1
   fi
   sensor_port="$(<"$scenario_root/sensor.port")"
+  http_port="$(<"$scenario_root/http.port")"
 
   setsid ros2 run netft_driver netft_node --ros-args -r __ns:=/netft_smoke -r wrench:=remapped_wrench \
     -p sensor_ip:=127.0.0.1 \
     -p sensor_port:="$sensor_port" \
+    -p http_port:="$http_port" \
     -p frame_id:=smoke_frame -p wrench_topic:=wrench -p bias_service:=bias \
-    -p counts_per_force:=2000000.0 -p counts_per_torque:=4000000.0 -p publish_rate:=50.0 \
+    -p use_sensor_calibration:=true -p publish_rate:=50.0 \
     -p expected_rdt_rate:=200.0 \
-    -p receive_timeout:=0.8 -p reconnect_initial_delay:=0.11 -p reconnect_max_delay:=0.37 \
+    -p receive_timeout:=0.8 -p configuration_connect_timeout:=0.23 \
+    -p configuration_timeout:=0.71 \
+    -p reconnect_initial_delay:=0.11 -p reconnect_max_delay:=0.37 \
     -p diagnostics_rate:=5.0 -p rate_tolerance:=0.35 -p publish_on_error:=true \
     >"$scenario_root/node.log" 2>&1 &
   node_pid=$!
@@ -283,7 +289,7 @@ run_full_graph_scenario() {
 
   python3 "$repo_root/test/integration/ros_graph_assertions.py" wrench \
     "$scenario_root/wrench.txt" --ros-version 2 --frame-id smoke_frame \
-    --axes 0.00005 -0.0001 0.00015 0.0000025 -0.000005 0.0000075
+    --axes 100.0 -200.0 300.0 0.001 -0.002 0.003
   python3 "$repo_root/test/integration/ros_graph_assertions.py" wrench \
     "$scenario_root/post_bias.txt" --ros-version 2 --frame-id smoke_frame \
     --axes 0.0 0.0 0.0 0.0 0.0 0.0
@@ -294,11 +300,16 @@ run_full_graph_scenario() {
     "$scenario_root/diagnostics.txt"
   python3 "$repo_root/test/integration/ros_graph_assertions.py" diagnostics \
     "$scenario_root/diagnostics.txt" --ros-version 2 \
-    --status-header "$repo_root/include/netft_driver/status.hpp" \
+    --status-header "$repo_root/src/ros/diagnostics.hpp" \
     --expected-rate 5.0 --configured-publish-rate 50.0 \
     --expected-value "sensor=127.0.0.1:$sensor_port" \
     --expected-value expected_receive_rate_hz=200.0 \
-    --expected-value rate_tolerance=0.350
+    --expected-value rate_tolerance=0.350 \
+    --expected-value configuration_source=sensor \
+    --expected-value force_unit=kN \
+    --expected-value torque_unit=N-mm \
+    --expected-value counts_per_force_unit=1000 \
+    --expected-value counts_per_torque_unit=10
 
   assert_file_contains 'success=True' "$scenario_root/bias.txt"
 
@@ -334,6 +345,7 @@ run_shutdown_scenario() {
   local scenario_root="$1"
   local domain="$2"
   local sensor_port
+  local http_port
   local group_id
   local leader_stopped=0
   local group_stopped=0
@@ -346,23 +358,26 @@ run_shutdown_scenario() {
   PYTHONPATH="$repo_root" python3 \
     "$repo_root/test/integration/fake_sensor_process.py" \
     --port-file "$scenario_root/sensor.port" \
+    --http-port-file "$scenario_root/http.port" \
     --commands-file "$scenario_root/commands.json" \
     --rate 200 >"$scenario_root/sensor.log" 2>&1 &
   sensor_pid=$!
   for _ in $(seq 1 100); do
-    [[ -s "$scenario_root/sensor.port" ]] && break
+    [[ -s "$scenario_root/sensor.port" && -s "$scenario_root/http.port" ]] && break
     kill -0 "$sensor_pid" 2>/dev/null || break
     sleep 0.05
   done
-  if [[ ! -s "$scenario_root/sensor.port" ]]; then
+  if [[ ! -s "$scenario_root/sensor.port" || ! -s "$scenario_root/http.port" ]]; then
     cat "$scenario_root/sensor.log" >&2
     return 1
   fi
   sensor_port="$(<"$scenario_root/sensor.port")"
+  http_port="$(<"$scenario_root/http.port")"
 
   setsid ros2 run netft_driver netft_node --ros-args \
     -p sensor_ip:=127.0.0.1 \
     -p sensor_port:="$sensor_port" \
+    -p http_port:="$http_port" \
     -p expected_rdt_rate:=200.0 \
     -p receive_timeout:=1.0 \
     >"$scenario_root/node.log" 2>&1 &
@@ -380,7 +395,7 @@ run_shutdown_scenario() {
   fi
   python3 "$repo_root/test/integration/ros_graph_assertions.py" wrench \
     "$scenario_root/wrench.txt" --ros-version 2 --frame-id netft_link \
-    --axes 0.0001 -0.0002 0.0003 0.00001 -0.00002 0.00003
+    --axes 100.0 -200.0 300.0 0.001 -0.002 0.003
 
   group_id="$node_pid"
   kill -INT -- "-$group_id"

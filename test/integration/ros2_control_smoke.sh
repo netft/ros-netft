@@ -95,9 +95,11 @@ run_installed_smoke() {
   local script_path
   local domain=""
   local installed_probe
+  local left_http_port
   local left_port
   local manager_executable
   local manager_pid
+  local right_http_port
   local right_port
   local robot_description
   local rsp_executable
@@ -117,17 +119,18 @@ run_installed_smoke() {
   acquire_ros2_domain domain
   export ROS_DOMAIN_ID="$domain"
   export ROS_LOCALHOST_ONLY=1
-  echo "ROS 2 control smoke leased domain: $domain"
+  echo "netft_control_domain=$domain"
 
   start_fake() {
     local side="$1"
     PYTHONPATH="$installed_share${PYTHONPATH:+:$PYTHONPATH}" \
       python3 "$installed_share/test/integration/fake_sensor_process.py" \
       --port-file "$smoke_root/$side.port" \
+      --http-port-file "$smoke_root/$side.http_port" \
       --commands-file "$smoke_root/$side.commands" --rate 200 &
     managed_pids+=("$!")
     local deadline=$((SECONDS + 10))
-    while [[ ! -s "$smoke_root/$side.port" ]]; do
+    while [[ ! -s "$smoke_root/$side.port" || ! -s "$smoke_root/$side.http_port" ]]; do
       if (( SECONDS >= deadline )); then
         echo "fake sensor $side did not start" >&2
         return 1
@@ -138,7 +141,9 @@ run_installed_smoke() {
 
   start_fake left
   start_fake right
+  left_http_port="$(<"$smoke_root/left.http_port")"
   left_port="$(<"$smoke_root/left.port")"
+  right_http_port="$(<"$smoke_root/right.http_port")"
   right_port="$(<"$smoke_root/right.port")"
   test "$installed_share" = "$(ros2 pkg prefix --share netft_driver)"
   installed_probe="$installed_share/test/integration/ros2_graph_probe.py"
@@ -150,11 +155,15 @@ run_installed_smoke() {
   <link name="base"/>
   <xacro:include filename="$installed_share/urdf/netft.ros2_control.xacro"/>
   <xacro:netft_ros2_control name="left_hardware" sensor_name="left_ft"
-    sensor_ip="127.0.0.1" sensor_port="$left_port" counts_per_force="100"
-    counts_per_torque="10" receive_timeout="5.0" activation_timeout="2.0"/>
+    sensor_ip="127.0.0.1" sensor_port="$left_port" http_port="$left_http_port"
+    use_sensor_calibration="true" counts_per_force="0" counts_per_torque="nan"
+    receive_timeout="5.0" configuration_connect_timeout="0.25"
+    configuration_timeout="0.75" activation_timeout="2.0"/>
   <xacro:netft_ros2_control name="right_hardware" sensor_name="right_ft"
-    sensor_ip="127.0.0.1" sensor_port="$right_port" counts_per_force="100"
-    counts_per_torque="10" receive_timeout="5.0" activation_timeout="2.0"/>
+    sensor_ip="127.0.0.1" sensor_port="$right_port" http_port="$right_http_port"
+    use_sensor_calibration="true" counts_per_force="0" counts_per_torque="nan"
+    receive_timeout="5.0" configuration_connect_timeout="0.25"
+    configuration_timeout="0.75" activation_timeout="2.0"/>
 </robot>
 EOF
 
@@ -222,7 +231,7 @@ EOF
     --wrench-topic /right_broadcaster/wrench \
     --bias-service /right_ft/bias \
     --bias-wrench-topic /right_broadcaster/wrench
-  echo "both broadcasters published"
+  echo "netft_control_event=publish_ready"
 
   terminate_pid "${managed_pids[0]}"
 
@@ -251,14 +260,14 @@ EOF
     fi
     sleep 0.1
   done
-  echo "post-fault hardware states: left=$left_state right=$right_state"
+  echo "netft_control_state=left:$left_state,right:$right_state"
   kill -0 "$manager_pid"
 
   run_control_probe control \
     --service-name /right_ft/bias \
     --wrench-topic /right_broadcaster/wrench
-  echo "right broadcaster published a new wrench after left timeout"
-  echo "ros2_control two-instance smoke passed"
+  echo "netft_control_event=right_survived"
+  echo "netft_control_result=pass"
 }
 
 main() {

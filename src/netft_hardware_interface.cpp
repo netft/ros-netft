@@ -1,7 +1,8 @@
-#include "netft_driver/ros2_control_compat.hpp"
+#include "ros/diagnostics.hpp"
+#include "ros/ros2_control_compat.hpp"
+#include "ros/unit_conversion.hpp"
 
-#include "netft_driver/client.hpp"
-#include "netft_driver/status.hpp"
+#include "netft/client.hpp"
 
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
@@ -30,7 +31,15 @@
 #include <vector>
 
 #ifdef NETFT_ROS2_CONTROL_TESTING
-#include <unistd.h>
+#include "ros/ros2_control_test_access.hpp"
+
+#if defined(_WIN32)
+#define NETFT_ROS2_CONTROL_TEST_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__) || defined(__clang__)
+#define NETFT_ROS2_CONTROL_TEST_EXPORT __attribute__((visibility("default")))
+#else
+#define NETFT_ROS2_CONTROL_TEST_EXPORT
+#endif
 #endif
 
 namespace netft_driver {
@@ -38,17 +47,21 @@ namespace netft_driver {
 class NetFTHardwareInterface;
 
 #ifdef NETFT_ROS2_CONTROL_TESTING
-struct NetFTClientTestAccess {
-  static void break_socket(NetFTClient & client) noexcept
-  {
-    std::lock_guard<std::mutex> lock{client.socket_mutex_};
-    if (client.socket_ >= 0) {
-      (void)::close(client.socket_);
-      client.socket_ = -1;
-      client.session_started_ = false;
-    }
-  }
-};
+namespace ros2_control_test_access::detail {
+
+void force_initial_sample_once() noexcept;
+void fail_state_write_once_at(std::size_t axis) noexcept;
+void latch_active_fault(FaultCode fault) noexcept;
+bool read_active_instance() noexcept;
+FaultCode active_fault_code() noexcept;
+FaultCode active_client_fault_code() noexcept;
+FaultCode active_latched_fault_code() noexcept;
+ActivityCounters active_activity_counters() noexcept;
+bool interface_write_fault_latched() noexcept;
+void throw_executor_cancel_once() noexcept;
+int auxiliary_thread_count() noexcept;
+
+}  // namespace ros2_control_test_access::detail
 #endif
 
 namespace {
@@ -64,7 +77,7 @@ std::atomic<bool> g_test_return_initial_sample{false};
 std::atomic<int> g_test_failed_write_axis{-1};
 std::atomic<bool> g_test_throw_executor_cancel{false};
 std::atomic<int> g_test_auxiliary_threads{0};
-const WrenchSample kInitialSample{};
+const SiSample kInitialSample{};
 #endif
 
 double parse_double(
@@ -87,9 +100,9 @@ double parse_double(
 
 int parse_port(
   const std::unordered_map<std::string, std::string> & parameters,
-  int fallback)
+  const char * field, int fallback)
 {
-  const auto found = parameters.find("sensor_port");
+  const auto found = parameters.find(field);
   if (found == parameters.end()) return fallback;
   try {
     std::size_t consumed = 0;
@@ -99,8 +112,20 @@ int parse_port(
     }
     return static_cast<int>(value);
   } catch (const std::exception &) {
-    throw std::invalid_argument{"sensor_port must be an integer between 1 and 65535"};
+    throw std::invalid_argument{
+      std::string{field} + " must be an integer between 1 and 65535"};
   }
+}
+
+bool parse_bool(
+  const std::unordered_map<std::string, std::string> & parameters,
+  const char * field, bool fallback)
+{
+  const auto found = parameters.find(field);
+  if (found == parameters.end()) return fallback;
+  if (found->second == "true" || found->second == "True") return true;
+  if (found->second == "false" || found->second == "False") return false;
+  throw std::invalid_argument{std::string{field} + " must be true or false"};
 }
 
 std::int64_t steady_nanoseconds(std::chrono::steady_clock::time_point time) noexcept
@@ -212,11 +237,11 @@ public:
     client_.reset();
     sample_generation_.store(0, std::memory_order_release);
     interface_write_fault_.store(false, std::memory_order_release);
-    fatal_fault_.store(FaultCode::None, std::memory_order_release);
-    sample_buffer_.initRT(WrenchSample{});
+    fatal_fault_.store(netft::FaultCode::None, std::memory_order_release);
+    sample_buffer_.initRT(SiSample{});
     invalidate_interfaces();
     try {
-      client_ = std::make_unique<NetFTClient>(client_config_);
+      client_ = std::make_unique<netft::Client>(client_config_);
       start_auxiliary();
       return hardware_interface::CallbackReturn::SUCCESS;
     } catch (const std::exception &) {
@@ -244,8 +269,8 @@ public:
     sample_generation_.store(0, std::memory_order_release);
     invalidate_interfaces();
     try {
-      client_->start([this](const WrenchSample & sample) {
-        sample_buffer_.writeFromNonRT(sample);
+      client_->start([this](const netft::Sample & sample) {
+        sample_buffer_.writeFromNonRT(to_si_sample(sample));
         sample_generation_.fetch_add(1, std::memory_order_release);
       });
     } catch (const std::exception &) {
@@ -296,7 +321,7 @@ public:
   hardware_interface::return_type read(
     const rclcpp::Time &, const rclcpp::Duration &) override
   {
-    const WrenchSample * sample = nullptr;
+    const SiSample * sample = nullptr;
 #ifdef NETFT_ROS2_CONTROL_TESTING
     if (g_test_return_initial_sample.exchange(false, std::memory_order_acq_rel)) {
       sample = &kInitialSample;
@@ -312,7 +337,7 @@ public:
       return hardware_interface::return_type::ERROR;
     }
     if (sample_is_stale(*sample)) {
-      latch_fatal_fault(FaultCode::Timeout);
+      latch_fatal_fault(netft::FaultCode::Timeout);
       invalidate_interfaces();
       return hardware_interface::return_type::ERROR;
     }
@@ -326,9 +351,17 @@ public:
 
 private:
 #ifdef NETFT_ROS2_CONTROL_TESTING
-  friend FaultCode ros2_control_compat::test_active_fault_code() noexcept;
-  friend bool ros2_control_compat::test_interface_write_fault_latched() noexcept;
-  friend void ros2_control_compat::test_break_active_socket() noexcept;
+  friend ros2_control_test_access::FaultCode
+    ros2_control_test_access::detail::active_fault_code() noexcept;
+  friend ros2_control_test_access::FaultCode
+    ros2_control_test_access::detail::active_client_fault_code() noexcept;
+  friend ros2_control_test_access::FaultCode
+    ros2_control_test_access::detail::active_latched_fault_code() noexcept;
+  friend ros2_control_test_access::ActivityCounters
+    ros2_control_test_access::detail::active_activity_counters() noexcept;
+  friend bool ros2_control_test_access::detail::interface_write_fault_latched() noexcept;
+  friend void ros2_control_test_access::detail::latch_active_fault(
+    ros2_control_test_access::FaultCode) noexcept;
 #endif
 
   void validate_hardware_info(const hardware_interface::HardwareInfo & info)
@@ -382,21 +415,31 @@ private:
   void parse_parameters(
     const std::unordered_map<std::string, std::string> & parameters)
   {
-    ClientConfig config;
+    netft::Config config;
     const auto host = parameters.find("sensor_ip");
     if (host != parameters.end()) config.sensor_host = host->second;
     if (config.sensor_host.find_first_not_of(" \t\n\r\f\v") == std::string::npos) {
       throw std::invalid_argument{"sensor_ip must be non-empty"};
     }
-    config.sensor_port = parse_port(parameters, config.sensor_port);
-    config.counts_per_force = parse_double(
-      parameters, "counts_per_force", config.counts_per_force);
-    config.counts_per_torque = parse_double(
-      parameters, "counts_per_torque", config.counts_per_torque);
+    config.rdt_port = parse_port(parameters, "sensor_port", config.rdt_port);
+    config.http_port = parse_port(parameters, "http_port", config.http_port);
     config.receive_timeout = std::chrono::duration<double>{parse_double(
       parameters, "receive_timeout", config.receive_timeout.count())};
-    config.recovery_policy = RecoveryPolicy::FailStop;
-    validate(config);
+    config.configuration_connect_timeout = std::chrono::duration<double>{parse_double(
+      parameters, "configuration_connect_timeout",
+      config.configuration_connect_timeout.count())};
+    config.configuration_timeout = std::chrono::duration<double>{parse_double(
+      parameters, "configuration_timeout", config.configuration_timeout.count())};
+    if (!parse_bool(parameters, "use_sensor_calibration", true)) {
+      config.calibration_override = netft::Calibration{
+        parse_double(parameters, "counts_per_force", 1000000.0),
+        parse_double(parameters, "counts_per_torque", 1000000.0),
+        netft::ForceUnit::Newton,
+        netft::TorqueUnit::NewtonMeter,
+      };
+    }
+    config.recovery_policy = netft::RecoveryPolicy::FailStop;
+    netft::validate(config);
 
     activation_timeout_ = std::chrono::duration<double>{parse_double(
       parameters, "activation_timeout", 2.0)};
@@ -443,7 +486,7 @@ private:
       [this](const std::shared_ptr<std_srvs::srv::Trigger::Request>,
         std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
         try {
-          if (!client_) throw NotConnectedError{"client is not configured"};
+          if (!client_) throw std::runtime_error{"client is not configured"};
           client_->bias();
           response->success = true;
           response->message = "software bias command sent and RDT streaming restarted";
@@ -506,12 +549,13 @@ private:
   void publish_diagnostics()
   {
     if (!client_ || !evaluator_ || !diagnostics_publisher_) return;
-    auto snapshot = client_->health_snapshot();
+    auto snapshot = client_->health();
     const auto plugin_fault = fatal_fault_.load(std::memory_order_acquire);
-    if (plugin_fault != FaultCode::None && snapshot.fault_code == FaultCode::None) {
-      snapshot.state = ClientState::Faulted;
+    if (plugin_fault != netft::FaultCode::None &&
+        snapshot.fault_code == netft::FaultCode::None) {
+      snapshot.state = netft::ClientState::Faulted;
       snapshot.fault_code = plugin_fault;
-      if (snapshot.last_error.empty() && plugin_fault == FaultCode::Timeout) {
+      if (snapshot.last_error.empty() && plugin_fault == netft::FaultCode::Timeout) {
         snapshot.last_error = "no valid RDT record before timeout";
       }
     }
@@ -520,7 +564,7 @@ private:
     status.level = static_cast<std::uint8_t>(report.level);
     status.name = "netft_driver: " + sensor_name_;
     status.message = report.message;
-    status.hardware_id = snapshot.sensor_host + ":" + std::to_string(snapshot.sensor_port);
+    status.hardware_id = snapshot.sensor_host + ":" + std::to_string(snapshot.rdt_port);
     status.values.reserve(report.values.size());
     for (const auto & value : report.values) {
       diagnostic_msgs::msg::KeyValue item;
@@ -534,9 +578,9 @@ private:
     diagnostics_publisher_->publish(message);
   }
 
-  void latch_fatal_fault(const FaultCode fault) noexcept
+  void latch_fatal_fault(const netft::FaultCode fault) noexcept
   {
-    auto expected = FaultCode::None;
+    auto expected = netft::FaultCode::None;
     (void)fatal_fault_.compare_exchange_strong(
       expected, fault, std::memory_order_acq_rel);
   }
@@ -544,13 +588,13 @@ private:
   bool fault_latched() noexcept
   {
     if (!client_) return true;
-    if (client_->faulted() && client_->fault_code() != FaultCode::None) {
+    if (client_->faulted() && client_->fault_code() != netft::FaultCode::None) {
       latch_fatal_fault(client_->fault_code());
     }
-    return fatal_fault_.load(std::memory_order_acquire) != FaultCode::None;
+    return fatal_fault_.load(std::memory_order_acquire) != netft::FaultCode::None;
   }
 
-  bool sample_is_stale(const WrenchSample & sample) const noexcept
+  bool sample_is_stale(const SiSample & sample) const noexcept
   {
     const auto received_ns = steady_nanoseconds(sample.received_at);
     const auto now_ns = steady_nanoseconds(std::chrono::steady_clock::now());
@@ -559,7 +603,7 @@ private:
     return received_ns <= 0 || now_ns - received_ns > timeout_ns;
   }
 
-  bool write_axes(const WrenchSample & sample) noexcept
+  bool write_axes(const SiSample & sample) noexcept
   {
     const std::array<double, 6> values{
       sample.force[0], sample.force[1], sample.force[2],
@@ -600,7 +644,7 @@ private:
     invalidate_interfaces();
   }
 
-  ClientConfig client_config_{};
+  netft::Config client_config_{};
   std::chrono::duration<double> activation_timeout_{2.0};
   double diagnostics_rate_{1.0};
   double expected_rdt_rate_{2000.0};
@@ -608,7 +652,7 @@ private:
   std::string sensor_name_;
   std::string ros_name_token_;
   std::string bias_service_name_;
-  std::unique_ptr<NetFTClient> client_;
+  std::unique_ptr<netft::Client> client_;
   std::unique_ptr<DiagnosticEvaluator> evaluator_;
   std::shared_ptr<rclcpp::Node> auxiliary_node_;
   std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> auxiliary_executor_;
@@ -617,10 +661,10 @@ private:
   rclcpp::TimerBase::SharedPtr diagnostic_timer_;
   std::thread auxiliary_thread_;
   std::atomic<bool> auxiliary_stopping_{false};
-  realtime_tools::RealtimeBuffer<WrenchSample> sample_buffer_;
+  realtime_tools::RealtimeBuffer<SiSample> sample_buffer_;
   std::atomic<std::uint64_t> sample_generation_{0};
   std::atomic<bool> interface_write_fault_{false};
-  std::atomic<FaultCode> fatal_fault_{FaultCode::None};
+  std::atomic<netft::FaultCode> fatal_fault_{netft::FaultCode::None};
 #ifdef NETFT_ROS2_CONTROL_LEGACY_API
   std::array<double, 6> state_values_{};
 #else
@@ -629,30 +673,63 @@ private:
 };
 
 static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
-static_assert(std::atomic<FaultCode>::is_always_lock_free);
+static_assert(std::atomic<netft::FaultCode>::is_always_lock_free);
 
 #ifdef NETFT_ROS2_CONTROL_TESTING
-namespace ros2_control_compat {
+namespace ros2_control_test_access::detail {
+namespace {
 
-void test_force_initial_sample_once() noexcept
+FaultCode to_test_fault(const netft::FaultCode fault) noexcept
+{
+  switch (fault) {
+    case netft::FaultCode::None: return FaultCode::None;
+    case netft::FaultCode::SensorConfiguration: return FaultCode::SensorConfiguration;
+    case netft::FaultCode::Timeout: return FaultCode::Timeout;
+    case netft::FaultCode::Socket: return FaultCode::Socket;
+    case netft::FaultCode::SeriousStatus: return FaultCode::SeriousStatus;
+    case netft::FaultCode::FtStall: return FaultCode::FtStall;
+    case netft::FaultCode::FtBackward: return FaultCode::FtBackward;
+    case netft::FaultCode::MalformedStorm: return FaultCode::MalformedStorm;
+    case netft::FaultCode::Callback: return FaultCode::Callback;
+  }
+  return FaultCode::None;
+}
+
+netft::FaultCode to_client_fault(const FaultCode fault) noexcept
+{
+  switch (fault) {
+    case FaultCode::None: return netft::FaultCode::None;
+    case FaultCode::SensorConfiguration: return netft::FaultCode::SensorConfiguration;
+    case FaultCode::Timeout: return netft::FaultCode::Timeout;
+    case FaultCode::Socket: return netft::FaultCode::Socket;
+    case FaultCode::SeriousStatus: return netft::FaultCode::SeriousStatus;
+    case FaultCode::FtStall: return netft::FaultCode::FtStall;
+    case FaultCode::FtBackward: return netft::FaultCode::FtBackward;
+    case FaultCode::MalformedStorm: return netft::FaultCode::MalformedStorm;
+    case FaultCode::Callback: return netft::FaultCode::Callback;
+  }
+  return netft::FaultCode::None;
+}
+
+}  // namespace
+
+void force_initial_sample_once() noexcept
 {
   g_test_return_initial_sample.store(true, std::memory_order_release);
 }
 
-void test_fail_state_write_once_at(const std::size_t axis) noexcept
+void fail_state_write_once_at(const std::size_t axis) noexcept
 {
   g_test_failed_write_axis.store(static_cast<int>(axis), std::memory_order_release);
 }
 
-void test_break_active_socket() noexcept
+void latch_active_fault(const FaultCode fault) noexcept
 {
   auto * instance = g_test_instance.load(std::memory_order_acquire);
-  if (instance != nullptr && instance->client_) {
-    NetFTClientTestAccess::break_socket(*instance->client_);
-  }
+  if (instance != nullptr) instance->latch_fatal_fault(to_client_fault(fault));
 }
 
-bool test_read_active_instance() noexcept
+bool read_active_instance() noexcept
 {
   auto * instance = g_test_instance.load(std::memory_order_acquire);
   if (instance == nullptr) return false;
@@ -661,36 +738,131 @@ bool test_read_active_instance() noexcept
          hardware_interface::return_type::OK;
 }
 
-FaultCode test_active_fault_code() noexcept
+FaultCode active_fault_code() noexcept
 {
   const auto * instance = g_test_instance.load(std::memory_order_acquire);
   if (instance == nullptr) return FaultCode::None;
   const auto latched = instance->fatal_fault_.load(std::memory_order_acquire);
-  if (latched != FaultCode::None || !instance->client_) return latched;
-  return instance->client_->fault_code();
+  if (latched != netft::FaultCode::None || !instance->client_) {
+    return to_test_fault(latched);
+  }
+  return to_test_fault(instance->client_->fault_code());
 }
 
-bool test_interface_write_fault_latched() noexcept
+FaultCode active_client_fault_code() noexcept
+{
+  const auto * instance = g_test_instance.load(std::memory_order_acquire);
+  if (instance == nullptr || !instance->client_) return FaultCode::None;
+  return to_test_fault(instance->client_->fault_code());
+}
+
+FaultCode active_latched_fault_code() noexcept
+{
+  const auto * instance = g_test_instance.load(std::memory_order_acquire);
+  if (instance == nullptr) return FaultCode::None;
+  return to_test_fault(instance->fatal_fault_.load(std::memory_order_acquire));
+}
+
+ActivityCounters active_activity_counters() noexcept
+{
+  const auto * instance = g_test_instance.load(std::memory_order_acquire);
+  if (instance == nullptr) return {};
+  return {
+    instance->sample_generation_.load(std::memory_order_acquire),
+  };
+}
+
+bool interface_write_fault_latched() noexcept
 {
   const auto * instance = g_test_instance.load(std::memory_order_acquire);
   return instance != nullptr &&
          instance->interface_write_fault_.load(std::memory_order_acquire);
 }
 
-void test_throw_executor_cancel_once() noexcept
+void throw_executor_cancel_once() noexcept
 {
   g_test_throw_executor_cancel.store(true, std::memory_order_release);
 }
 
-int test_auxiliary_thread_count() noexcept
+int auxiliary_thread_count() noexcept
 {
   return g_test_auxiliary_threads.load(std::memory_order_acquire);
 }
 
-}  // namespace ros2_control_compat
+}  // namespace ros2_control_test_access::detail
 #endif
 
 }  // namespace netft_driver
+
+#ifdef NETFT_ROS2_CONTROL_TESTING
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void
+netft_ros2_control_test_force_initial_sample_once() noexcept
+{
+  netft_driver::ros2_control_test_access::detail::force_initial_sample_once();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void netft_ros2_control_test_fail_state_write_once_at(
+  const std::size_t axis) noexcept
+{
+  netft_driver::ros2_control_test_access::detail::fail_state_write_once_at(axis);
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void netft_ros2_control_test_latch_active_fault(
+  const netft_driver::ros2_control_test_access::FaultCode fault) noexcept
+{
+  netft_driver::ros2_control_test_access::detail::latch_active_fault(fault);
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT bool
+netft_ros2_control_test_read_active_instance() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::read_active_instance();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT netft_driver::ros2_control_test_access::FaultCode
+netft_ros2_control_test_active_fault_code() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::active_fault_code();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT netft_driver::ros2_control_test_access::FaultCode
+netft_ros2_control_test_active_client_fault_code() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::active_client_fault_code();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT netft_driver::ros2_control_test_access::FaultCode
+netft_ros2_control_test_active_latched_fault_code() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::active_latched_fault_code();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT netft_driver::ros2_control_test_access::ActivityCounters
+netft_ros2_control_test_active_activity_counters() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::active_activity_counters();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT bool
+netft_ros2_control_test_interface_write_fault_latched() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::interface_write_fault_latched();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void
+netft_ros2_control_test_throw_executor_cancel_once() noexcept
+{
+  netft_driver::ros2_control_test_access::detail::throw_executor_cancel_once();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT int
+netft_ros2_control_test_auxiliary_thread_count() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::auxiliary_thread_count();
+}
+
+#undef NETFT_ROS2_CONTROL_TEST_EXPORT
+#endif
 
 PLUGINLIB_EXPORT_CLASS(
   netft_driver::NetFTHardwareInterface, hardware_interface::SensorInterface)

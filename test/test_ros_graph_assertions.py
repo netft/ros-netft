@@ -26,13 +26,15 @@ def test_smokes_exercise_namespaced_remapped_graph_and_all_nondefault_parameters
     values = {
         "sensor_ip": "127.0.0.1",
         "sensor_port": '"$sensor_port"',
+        "http_port": '"$http_port"',
         "frame_id": "smoke_frame",
         "wrench_topic": "wrench",
         "bias_service": "bias",
-        "counts_per_force": "2000000.0",
-        "counts_per_torque": "4000000.0",
+        "use_sensor_calibration": "true",
         "publish_rate": "50.0",
         "receive_timeout": "0.8",
+        "configuration_connect_timeout": "0.23",
+        "configuration_timeout": "0.71",
         "reconnect_initial_delay": "0.11",
         "reconnect_max_delay": "0.37",
         "diagnostics_rate": "5.0",
@@ -61,13 +63,13 @@ def test_wrench_assertion_requires_valid_stamp_frame_and_independent_axes(
   frame_id: {frame}
 wrench:
   force:
-    x: 5e-05
-    y: -0.0001
-    z: 0.00015
+    x: 100.0
+    y: -200.0
+    z: 300.0
   torque:
-    x: 2.5e-06
-    y: -5e-06
-    z: 7.5e-06
+    x: 0.001
+    y: -0.002
+    z: 0.003
 """,
         encoding="utf-8",
     )
@@ -76,7 +78,7 @@ wrench:
         output,
         ros_version=ros_version,
         frame_id="smoke_frame",
-        axes=(5e-5, -1e-4, 1.5e-4, 2.5e-6, -5e-6, 7.5e-6),
+        axes=(100.0, -200.0, 300.0, 0.001, -0.002, 0.003),
     )
 
     output.write_text(
@@ -90,12 +92,12 @@ wrench:
             output,
             ros_version=ros_version,
             frame_id="smoke_frame",
-            axes=(5e-5, -1e-4, 1.5e-4, 2.5e-6, -5e-6, 7.5e-6),
+            axes=(100.0, -200.0, 300.0, 0.001, -0.002, 0.003),
         )
 
 
 def test_diagnostics_assertion_matches_core_key_order_rate_and_values(tmp_path):
-    status_header = ROOT / "include/netft_driver/status.hpp"
+    status_header = ROOT / "src/ros/diagnostics.hpp"
     header_text = status_header.read_text(encoding="utf-8")
     key_block = header_text.split("kDiagnosticValueKeys{", 1)[1].split("};", 1)[0]
     keys = [part.split('"', 2)[1] for part in key_block.split(",")]
@@ -106,7 +108,7 @@ def test_diagnostics_assertion_matches_core_key_order_rate_and_values(tmp_path):
             value = {
                 "expected_receive_rate_hz": "200.0",
                 "rate_tolerance": "0.350",
-                "publish_rate_hz": "50.0",
+                "delivery_rate_hz": "50.0",
             }.get(key, "fixture")
             pairs.append(f'- key: "{key}"\n  value: "{value}"')
         messages.append(
@@ -129,7 +131,7 @@ def test_diagnostics_assertion_matches_core_key_order_rate_and_values(tmp_path):
         expected_values={
             "expected_receive_rate_hz": "200.0",
             "rate_tolerance": "0.350",
-            "publish_rate_hz": "50.0",
+            "delivery_rate_hz": "50.0",
         },
     )
 

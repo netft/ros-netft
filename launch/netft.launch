@@ -1,9 +1,17 @@
 <launch>
   <arg name="sensor_ip" default="192.168.1.1"/>
   <arg name="sensor_port" default="49152"/>
+  <arg name="http_port" default="80"/>
+  <arg name="use_sensor_calibration" default="true"/>
+  <arg name="configuration_connect_timeout" default="0.5"/>
+  <arg name="configuration_timeout" default="1.0"/>
   <node pkg="netft_driver" type="netft_node" name="netft" output="screen">
     <rosparam command="load" file="$(find netft_driver)/config/netft_ros1.yaml"/>
     <param name="sensor_ip" value="$(arg sensor_ip)"/>
-    <param name="sensor_port" value="$(arg sensor_port)"/>
+    <param name="sensor_port" value="$(arg sensor_port)" type="int"/>
+    <param name="http_port" value="$(arg http_port)" type="int"/>
+    <param name="use_sensor_calibration" value="$(arg use_sensor_calibration)" type="bool"/>
+    <param name="configuration_connect_timeout" value="$(arg configuration_connect_timeout)" type="double"/>
+    <param name="configuration_timeout" value="$(arg configuration_timeout)" type="double"/>
   </node>
 </launch>

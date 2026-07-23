@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 temp_root="$(mktemp -d)"
+symbol_audit="$repo_root/test/integration/audit_ros2_control_symbols.sh"
 roscore_pid=""
 cleanup() {
   if [[ -n "$roscore_pid" ]]; then
@@ -24,7 +25,24 @@ env -u ROS_VERSION cmake \
 assert_native_install() {
   local install_root="$1"
   local ros_version="$2"
+  local install_manifest="$3"
   local share_root
+  test -f "$install_manifest"
+  if grep -Eq '/(include/netft(/|$)|src/core(/|$)|libnetft_core([./]|$))' \
+      "$install_manifest"; then
+    echo "private core artifact found in install manifest" >&2
+    grep -E '/(include/netft(/|$)|src/core(/|$)|libnetft_core([./]|$))' \
+      "$install_manifest" >&2
+    return 1
+  fi
+  if find "$install_root" \
+      \( -path '*/include/netft' -o -path '*/include/netft/*' \
+      -o -path '*/src/core' -o -path '*/src/core/*' \
+      -o -name 'libnetft_core' -o -name 'libnetft_core.*' \) \
+      -print -quit | grep -q .; then
+    echo "private core artifact found in install tree" >&2
+    return 1
+  fi
   if [[ "$ros_version" == "1" ]]; then
     share_root="$install_root/share/netft_driver"
     test -f "$share_root/launch/netft.launch"
@@ -46,6 +64,13 @@ assert_native_install() {
     test ! -e "$share_root/config/netft_ros1.yaml"
     test -x "$install_root/lib/netft_driver/netft_node"
     test -x "$install_root/lib/netft_driver/netft_check"
+    test -f "$install_root/lib/libnetft_ros2_control.so"
+    "$symbol_audit" "$install_root/lib/libnetft_ros2_control.so"
+    if find "$install_root" -name 'libnetft_ros2_control_testing.so*' \
+        -print -quit | grep -q .; then
+      echo "test-only ros2_control plugin found in install tree" >&2
+      return 1
+    fi
     ! find "$install_root" -type d -path '*/site-packages/netft_driver' -print -quit | grep -q .
   fi
 }
@@ -58,7 +83,8 @@ validate_junit_result() {
 if [[ "${ROS_VERSION:-}" == "1" ]]; then
   cd "$temp_root/ws"
   catkin_make -DCMAKE_BUILD_TYPE=Release install
-  assert_native_install "$temp_root/ws/install" 1
+  assert_native_install \
+    "$temp_root/ws/install" 1 "$temp_root/ws/build/install_manifest.txt"
   master_port="$(python3 -c 'import socket; sock = socket.socket(); sock.bind(("127.0.0.1", 0)); print(sock.getsockname()[1]); sock.close()')"
   export ROS_MASTER_URI="http://127.0.0.1:${master_port}"
   export ROS_HOSTNAME="127.0.0.1"
@@ -87,8 +113,11 @@ elif [[ "${ROS_VERSION:-}" == "2" ]]; then
     --packages-select netft_driver \
     --event-handlers console_direct+ \
     --cmake-args -DCMAKE_BUILD_TYPE=Release
+  "$symbol_audit" \
+    "$temp_root/ws/build/netft_driver/libnetft_ros2_control.so"
   assert_native_install \
-    "$temp_root/ws/install/netft_driver" 2
+    "$temp_root/ws/install/netft_driver" 2 \
+    "$temp_root/ws/build/netft_driver/install_manifest.txt"
   colcon test \
     --packages-select netft_driver \
     --event-handlers console_direct+

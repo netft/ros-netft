@@ -255,7 +255,7 @@ def test_generated_and_local_paths_are_ignored(path, is_ignored):
         "config/settings.json",
         "src/driver.cpp",
         "src/Testing/test_case.cpp",
-        "include/netft_driver/client.hpp",
+        "src/ros/diagnostics.hpp",
         "src/Makefile",
         "config/colcon.meta",
     ),

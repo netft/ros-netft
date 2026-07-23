@@ -2,6 +2,16 @@
 Changelog for package netft_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.0 (2026-07-22)
+------------------
+* Add a private ``netft-cpp`` v0.1.2 core snapshot and remove the duplicate original runtime.
+* Read sensor-reported calibration by default and convert its native force and torque units to N and Nm.
+* Add the explicit ``use_sensor_calibration=false`` manual override, with counts/N and counts/Nm inputs.
+* Add HTTP configuration port and timeout parameters for sensor calibration discovery.
+* Support Noetic's GCC 9 standard library with an Apache-2.0 XML parser compatibility translation unit.
+* Keep the ros2_control plugin ABI private by hiding core and implementation symbols.
+* License the complete repository under Apache-2.0, matching the upstream core.
+
 0.2.2 (2026-07-22)
 ------------------
 * Replace the project-specific sensor address in defaults and examples with

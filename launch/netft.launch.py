@@ -15,6 +15,12 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("sensor_ip", default_value="192.168.1.1"),
             DeclareLaunchArgument("sensor_port", default_value="49152"),
+            DeclareLaunchArgument("http_port", default_value="80"),
+            DeclareLaunchArgument("use_sensor_calibration", default_value="true"),
+            DeclareLaunchArgument(
+                "configuration_connect_timeout", default_value="0.5"
+            ),
+            DeclareLaunchArgument("configuration_timeout", default_value="1.0"),
             Node(
                 package="netft_driver",
                 executable="netft_node",
@@ -26,6 +32,21 @@ def generate_launch_description():
                         "sensor_ip": LaunchConfiguration("sensor_ip"),
                         "sensor_port": ParameterValue(
                             LaunchConfiguration("sensor_port"), value_type=int
+                        ),
+                        "http_port": ParameterValue(
+                            LaunchConfiguration("http_port"), value_type=int
+                        ),
+                        "use_sensor_calibration": ParameterValue(
+                            LaunchConfiguration("use_sensor_calibration"),
+                            value_type=bool,
+                        ),
+                        "configuration_connect_timeout": ParameterValue(
+                            LaunchConfiguration("configuration_connect_timeout"),
+                            value_type=float,
+                        ),
+                        "configuration_timeout": ParameterValue(
+                            LaunchConfiguration("configuration_timeout"),
+                            value_type=float,
                         ),
                     },
                 ],
