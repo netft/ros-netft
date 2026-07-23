@@ -10,6 +10,7 @@ Changelog for package netft_driver
 * Add HTTP configuration port and timeout parameters for sensor calibration discovery.
 * Support Noetic's GCC 9 standard library with an Apache-2.0 XML parser compatibility translation unit.
 * Keep the ros2_control plugin ABI private by hiding core and implementation symbols.
+* License the complete repository under Apache-2.0, matching the upstream core.
 
 0.2.2 (2026-07-22)
 ------------------

@@ -92,9 +92,8 @@ issued. Do not publish private network details or sensor identifiers.
 
 ## License
 
-ROS integration contributions are licensed under the repository's
-[MIT License](LICENSE). The copied `src/core/` snapshot and the derived
-`src/compat/xml_config.cpp` fallback remain under the upstream
-[Apache-2.0 License](src/core/LICENSE). Propose reusable core fixes upstream
-first, then copy them from a released immutable upstream revision and update
-the fallback when the XML parser changes.
+Contributions are licensed under the repository's
+[Apache-2.0 License](LICENSE). The copied `src/core/` snapshot retains the
+upstream license copy at [src/core/LICENSE](src/core/LICENSE). Propose reusable
+core fixes upstream first, then copy them from a released immutable upstream
+revision and update the fallback when the XML parser changes.

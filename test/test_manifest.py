@@ -149,6 +149,9 @@ def test_manifest_has_conditional_ros_build_types_and_dependencies():
     root = ElementTree.parse(str(ROOT / "package.xml")).getroot()
     assert root.attrib["format"] == "3"
     assert root.findtext("name") == "netft_driver"
+    assert [element.text.strip() for element in root.findall("license")] == [
+        "Apache-2.0"
+    ]
     dependencies = {
         (element.tag, element.text.strip(), element.attrib.get("condition"))
         for element in root

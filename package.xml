@@ -5,7 +5,6 @@
   <version>0.3.0</version>
   <description>Native ROS 1, ROS 2, and ros2_control driver for ATI Net F/T RDT sensors.</description>
   <maintainer email="hanxudong159@126.com">Xudong Han</maintainer>
-  <license>MIT</license>
   <license>Apache-2.0</license>
   <url type="website">https://github.com/netft/ros-netft</url>
   <url type="repository">https://github.com/netft/ros-netft</url>
