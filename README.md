@@ -226,10 +226,14 @@ unless `publish_on_error=true`.
 | `frame_id` | `netft_link` | Wrench header frame |
 | `wrench_topic` | `/netft/wrench` | Output topic |
 | `bias_service` | `/netft/bias` | Software-bias service |
-| `counts_per_force` | `1000000.0` | Counts per N |
-| `counts_per_torque` | `1000000.0` | Counts per Nm |
+| `http_port` | `80` | Sensor HTTP configuration port |
+| `use_sensor_calibration` | `true` | Read calibration and native units from the sensor over HTTP |
+| `counts_per_force` | `1000000.0` | Counts per N when `use_sensor_calibration=false` |
+| `counts_per_torque` | `1000000.0` | Counts per Nm when `use_sensor_calibration=false` |
 | `publish_rate` | `0.0` | Zero publishes every sample; a positive value limits Hz |
 | `receive_timeout` | `0.1` | Seconds without a valid record before recovery |
+| `configuration_connect_timeout` | `0.5` | HTTP connection timeout in seconds |
+| `configuration_timeout` | `1.0` | Total HTTP configuration-request timeout in seconds |
 | `reconnect_initial_delay` | `0.25` | Initial recovery delay in seconds |
 | `reconnect_max_delay` | `5.0` | Maximum recovery delay in seconds |
 | `diagnostics_rate` | `1.0` | Diagnostics Hz |
@@ -239,14 +243,20 @@ unless `publish_on_error=true`.
 
 ### ros2_control parameters
 
-The Xacro exposes the endpoint, independent force and torque scales,
-`receive_timeout`, and `activation_timeout`. Additional hardware parameters
-may be placed in the generated `<hardware>` element:
+The Xacro exposes the RDT and HTTP endpoints, calibration controls,
+`receive_timeout`, configuration timeouts, and `activation_timeout`. Additional
+hardware parameters may be placed in the generated `<hardware>` element:
 
 | Parameter | Default | Meaning |
 |---|---:|---|
 | `activation_timeout` | `2.0` | Seconds to wait for the first healthy sample |
 | `bias_service` | `/<encoded sensor token>/bias` | Instance-specific software-bias service; see the encoding rule above |
+| `http_port` | `80` | Sensor HTTP configuration port |
+| `use_sensor_calibration` | `true` | Read calibration and native units from the sensor over HTTP |
+| `counts_per_force` | `1000000.0` | Counts per N when `use_sensor_calibration=false` |
+| `counts_per_torque` | `1000000.0` | Counts per Nm when `use_sensor_calibration=false` |
+| `configuration_connect_timeout` | `0.5` | HTTP connection timeout in seconds |
+| `configuration_timeout` | `1.0` | Total HTTP configuration-request timeout in seconds |
 | `diagnostics_rate` | `1.0` | Diagnostics publication rate in Hz |
 | `expected_rdt_rate` | `2000.0` | Expected sensor receive rate in Hz |
 | `rate_tolerance` | `0.2` | Allowed fractional receive-rate deviation |
@@ -254,6 +264,14 @@ may be placed in the generated `<hardware>` element:
 `frame_id`, `wrench_topic`, and publication rate belong to the broadcaster in
 `ros2_control`. Standalone reconnect-delay and `publish_on_error` parameters do
 not apply to the fail-stop plugin.
+
+### Calibration and HTTP configuration
+
+Automatic sensor configuration is enabled by default. Before streaming, the driver requests the sensor configuration from `http://<sensor_ip>:<http_port>/netftapi2.xml`, using `http_port`, `configuration_connect_timeout`, and `configuration_timeout`. It uses the sensor-reported counts and native force and torque units, then converts every published wrench to N and Nm.
+
+Set `use_sensor_calibration=false` only when an explicit manual calibration is required. This disables HTTP discovery completely and makes `counts_per_force` and `counts_per_torque` the complete calibration override: they are counts/N and counts/Nm, respectively. The override is always interpreted as N and Nm; do not enter counts for another native unit.
+
+With automatic configuration, an unreachable HTTP endpoint, connection or total timeout, non-200 response, oversized response, or invalid configuration prevents a session from starting. The standalone driver reports the configuration failure in diagnostics and retries through its normal reconnect backoff. The `ros2_control` plugin is fail-stop, so activation fails until the configuration issue is corrected and the component is activated again.
 
 ## Operations and safety
 
@@ -320,6 +338,10 @@ pixi run -e humble ros2-control-smoke
 See [Architecture](docs/architecture.md) for implementation and lifecycle
 boundaries.
 
+## Core provenance and licenses
+
+`src/core/` is a private, immutable snapshot of the `netft-cpp` v0.1.2 library. It is included in this source package and does not require an external `netft-cpp` build dependency. The snapshot retains the upstream `netft` namespace and is licensed under Apache-2.0; the ROS integration around it remains MIT-licensed.
+
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an
@@ -328,4 +350,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+The ROS integration is MIT-licensed; see [LICENSE](LICENSE). `src/core/` is Apache-2.0; see [src/core/LICENSE](src/core/LICENSE).

@@ -66,6 +66,17 @@ Before opening a pull request:
 Open an issue before starting a large feature or an interface-breaking change
 so the scope can be agreed upon first.
 
+## Core snapshot updates
+
+1. Update and release `netft-cpp` first.
+2. Copy only the library paths from an immutable upstream tag.
+3. Preserve the `netft` namespace and the Apache-2.0 license.
+4. Update `src/core/UPSTREAM` with the copied tag and commit.
+5. Rerun the byte comparison and every snapshot and ROS test.
+6. Keep ROS-specific changes out of `src/core/`; port reusable fixes upstream before copying them back.
+
+Do not add an automated downloader or submodule for the core snapshot.
+
 ## Physical sensor safety
 
 The automated test suite does not require a physical sensor. Do not perform
