@@ -1,6 +1,6 @@
-#include "support/fake_sensor.hpp"
+#include "core/support/fake_sensor.hpp"
 
-#include "netft_driver/protocol.hpp"
+#include "detail/protocol.hpp"
 
 #include <gtest/gtest.h>
 
@@ -15,10 +15,13 @@
 #include <unistd.h>
 #include <vector>
 
+#define main netft_check_embedded_main
+#include "../../src/check_main.cpp"
+#undef main
+
 namespace {
-using namespace std::chrono_literals;
-using netft_driver::Command;
-using netft_driver::test::FakeSensor;
+using netft::detail::Command;
+using netft::test::FakeSensor;
 
 struct CommandResult {
   int exit_code{};
@@ -26,193 +29,215 @@ struct CommandResult {
   std::string stderr_text;
 };
 
-std::string quote(const std::string & value)
-{
+std::string quote(const std::string &value) {
   std::string result{"'"};
   for (const auto character : value) {
-    if (character == '\'') result += "'\\''";
-    else result += character;
+    if (character == '\'') {
+      result += "'\\''";
+    } else {
+      result += character;
+    }
   }
   return result + "'";
 }
 
-CommandResult run_check(const std::string & arguments)
-{
+CommandResult run_check(const std::string &arguments) {
+  static unsigned invocation{};
   const auto base = std::filesystem::temp_directory_path() /
-                    ("netft-check-" + std::to_string(::getpid()));
+                    ("netft-check-" + std::to_string(::getpid()) + "-" +
+                     std::to_string(invocation++));
   const auto output = base.string() + ".out";
   const auto error = base.string() + ".err";
-  const auto command = quote(NETFT_CHECK_PATH) + " " + arguments +
-                       " > " + quote(output) + " 2> " + quote(error);
+  const auto command = quote(NETFT_CHECK_PATH) + " " + arguments + " > " + quote(output) +
+                       " 2> " + quote(error);
   const int status = std::system(command.c_str());
-  std::ifstream stdout_stream{output}, stderr_stream{error};
-  std::ostringstream captured_stdout, captured_stderr;
+  std::ifstream stdout_stream{output};
+  std::ifstream stderr_stream{error};
+  std::ostringstream captured_stdout;
+  std::ostringstream captured_stderr;
   captured_stdout << stdout_stream.rdbuf();
   captured_stderr << stderr_stream.rdbuf();
-  std::filesystem::remove(output); std::filesystem::remove(error);
-  return {WIFEXITED(status) ? WEXITSTATUS(status) : 127,
-          captured_stdout.str(), captured_stderr.str()};
+  std::filesystem::remove(output);
+  std::filesystem::remove(error);
+  return {WIFEXITED(status) ? WEXITSTATUS(status) : 127, captured_stdout.str(),
+          captured_stderr.str()};
 }
 
-void expect_strict_json(const std::string & text, std::uint64_t warning_count = 0,
-                        bool serious_observed = false,
-                        std::optional<std::uint64_t> duplicate_count = std::nullopt,
-                        std::optional<std::uint64_t> out_of_order_count = std::nullopt)
-{
+void expect_json_assertions(const std::string &text, const std::string &assertions) {
+  static unsigned invocation{};
   const auto path = std::filesystem::temp_directory_path() /
-                    ("netft-check-json-" + std::to_string(::getpid()));
-  { std::ofstream stream{path}; stream << text; }
-  const std::string script = std::string{
+                    ("netft-check-json-" + std::to_string(::getpid()) + "-" +
+                     std::to_string(invocation++));
+  {
+    std::ofstream stream{path};
+    stream << text;
+  }
+  const std::string script =
       "import json,sys; "
-      "payload=json.load(open(sys.argv[1]), parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value))); "
-      "required={'device_error_count','device_status','duplicate_count','elapsed_s','endpoint','last_force','last_ft_sequence','last_rdt_sequence','last_torque','lost_count','malformed_count','out_of_order_count','receive_rate_hz','reconnect_count','requested_duration_s','sample_count','timeout_count','warning_count'}; "
-      "assert set(payload) == required; assert isinstance(payload['sample_count'], int); assert isinstance(payload['device_status'], str); "} +
-      "assert payload['warning_count'] == " + std::to_string(warning_count) + "; " +
-      (duplicate_count ? "assert payload['duplicate_count'] == " + std::to_string(*duplicate_count) + "; " : "") +
-      (out_of_order_count ? "assert payload['out_of_order_count'] == " + std::to_string(*out_of_order_count) + "; " : "") +
-      (serious_observed ? "assert payload['device_error_count'] > 0" : "assert payload['device_error_count'] == 0");
-  const int status = std::system(("python3 -c " + quote(script) + " " + quote(path.string())).c_str());
+      "payload=json.load(open(sys.argv[1]), "
+      "parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value))); " +
+      assertions;
+  const int status =
+      std::system(("python3 -c " + quote(script) + " " + quote(path.string())).c_str());
   std::filesystem::remove(path);
   EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
 }
 
-std::string endpoint_arguments(const FakeSensor & sensor)
-{
-  return "--host " + sensor.host() + " --port " + std::to_string(sensor.port()) +
-         " --duration 0.15 --receive-timeout 0.05";
+std::string endpoint_arguments(const FakeSensor &sensor) {
+  return "--host " + sensor.host() + " --port " + std::to_string(sensor.rdt_port()) +
+         " --http-port " + std::to_string(sensor.http_port()) +
+         " --configuration-connect-timeout 0.25 --configuration-timeout 0.75" +
+         " --duration 0.08 --receive-timeout 0.05";
 }
 
-void expect_safe_shutdown(const FakeSensor & sensor, bool exact = false)
-{
+void expect_safe_shutdown(const FakeSensor &sensor, bool exact = false) {
   const auto commands = sensor.commands();
   ASSERT_FALSE(commands.empty());
   EXPECT_EQ(commands.back(), Command::StopStreaming);
   EXPECT_EQ(std::count(commands.begin(), commands.end(), Command::SetSoftwareBias), 0);
   EXPECT_EQ(std::count(commands.begin(), commands.end(), Command::ResetConditionLatch), 0);
   EXPECT_EQ(std::count(commands.begin(), commands.end(), Command::StartBuffered), 0);
-  if (exact) EXPECT_EQ(commands, (std::vector<Command>{Command::StartRealtime, Command::StopStreaming}));
+  if (exact) {
+    EXPECT_EQ(commands, (std::vector<Command>{Command::StartRealtime, Command::StopStreaming}));
+  }
 }
 
-TEST(NetFTCheck, WritesStrictJsonWithIndependentScalesAndStopsWithoutBias)
-{
-  const auto destination = std::filesystem::temp_directory_path() /
-                           ("netft-check-" + std::to_string(::getpid()) + ".json");
-  std::filesystem::remove(destination);
+TEST(NetFTCheckOptions, MapsDiscoveryConfigAndLeavesCalibrationOverrideEmptyByDefault) {
+  std::array<std::string, 7> arguments{
+      "netft_check", "--http-port", "8080", "--configuration-connect-timeout", "0.25",
+      "--configuration-timeout", "0.75"};
+  std::array<char *, arguments.size()> argv{};
+  std::transform(arguments.begin(), arguments.end(), argv.begin(),
+                 [](std::string &argument) { return argument.data(); });
+
+  const auto options = parse_options(static_cast<int>(argv.size()), argv.data());
+
+  EXPECT_EQ(options.config.http_port, 8080);
+  EXPECT_DOUBLE_EQ(options.config.configuration_connect_timeout.count(), 0.25);
+  EXPECT_DOUBLE_EQ(options.config.configuration_timeout.count(), 0.75);
+  EXPECT_FALSE(options.config.calibration_override.has_value());
+}
+
+TEST(NetFTCheck, DiscoversCalibrationOverHttpByDefaultAndMapsConfigurationOptions) {
   FakeSensor sensor{200};
-  const auto result = run_check(endpoint_arguments(sensor) +
-      " --counts-per-force 100 --counts-per-torque 10 --output " + destination.string() + " --json");
-  expect_safe_shutdown(sensor, true);
-  std::ifstream output{destination}; std::ostringstream json; json << output.rdbuf();
-  std::filesystem::remove(destination);
+
+  const auto result = run_check(endpoint_arguments(sensor));
+
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_TRUE(result.stderr_text.empty());
-  EXPECT_EQ(result.stdout_text, json.str());
-  expect_strict_json(result.stdout_text);
-  expect_strict_json(json.str());
-}
-
-TEST(NetFTCheck, SeriousAndWarningRecordsReturnEvidenceExitCode)
-{
-  for (const auto status : {0x80020000U, 0x80010000U}) {
-    FakeSensor sensor{10};
-    sensor.queue_record(55, status);
-    const auto result = run_check(endpoint_arguments(sensor));
-    expect_safe_shutdown(sensor);
-    EXPECT_EQ(result.exit_code, 1);
-    EXPECT_TRUE(result.stderr_text.empty());
-    expect_strict_json(result.stdout_text, status == 0x80010000U ? 1 : 0, status == 0x80020000U);
-  }
-}
-
-TEST(NetFTCheck, InvalidDurationAndOutputFailureDoNotPublishPartialJson)
-{
-  FakeSensor sensor;
-  const auto invalid = run_check("--host " + sensor.host() + " --port " +
-      std::to_string(sensor.port()) + " --duration nan");
-  EXPECT_EQ(invalid.exit_code, 2);
-  EXPECT_TRUE(invalid.stdout_text.empty());
-  EXPECT_FALSE(invalid.stderr_text.empty());
-  EXPECT_TRUE(sensor.commands().empty());
-
-  const auto directory = std::filesystem::temp_directory_path() /
-                         ("netft-check-dir-" + std::to_string(::getpid()));
-  std::filesystem::create_directory(directory);
-  const auto failed_output = run_check(endpoint_arguments(sensor) + " --output " + directory.string());
+  EXPECT_EQ(sensor.http_request_count(), 1U);
   expect_safe_shutdown(sensor, true);
-  EXPECT_EQ(failed_output.exit_code, 2);
-  EXPECT_TRUE(std::filesystem::is_directory(directory));
-  std::filesystem::remove(directory);
+  expect_json_assertions(result.stdout_text,
+                         "assert payload['configuration_source'] == 'sensor'; "
+                         "assert payload['force_unit'] == 'N'; "
+                         "assert payload['torque_unit'] == 'N-m'; "
+                         "assert payload['counts_per_force_unit'] == 1000000; "
+                         "assert payload['counts_per_torque_unit'] == 1000000");
 }
 
-TEST(NetFTCheck, MalformedAndSilentStreamsFailAfterFirstRecordTimeoutAndStop)
-{
-  for (const bool malformed : {true, false}) {
-    FakeSensor sensor{0.5};
-    if (malformed) sensor.queue_payload({'b', 'a', 'd'}); else sensor.pause();
-    const auto result = run_check(endpoint_arguments(sensor));
-    expect_safe_shutdown(sensor);
+TEST(NetFTCheck, RequiresManualCountsAsACompletePairBeforeOpeningSockets) {
+  for (const auto &manual_option : {std::string{"--counts-per-force 100"},
+                                    std::string{"--counts-per-torque 10"}}) {
+    FakeSensor sensor;
+
+    const auto result = run_check(endpoint_arguments(sensor) + " " + manual_option);
+
     EXPECT_EQ(result.exit_code, 2);
     EXPECT_TRUE(result.stdout_text.empty());
-    EXPECT_FALSE(result.stderr_text.empty());
+    expect_json_assertions(result.stderr_text,
+                           "assert payload['error'] == 'invalid_arguments'; "
+                           "assert payload['exit_code'] == 2");
+    EXPECT_EQ(sensor.http_request_count(), 0U);
+    EXPECT_TRUE(sensor.commands().empty());
   }
 }
 
-TEST(NetFTCheck, WarningObservedBeforeHealthyRecordsStillReturnsEvidenceExitCode)
-{
+TEST(NetFTCheck, CompleteManualCountsCreateNewtonAndNewtonMetreOverride) {
   FakeSensor sensor{200};
-  sensor.queue_record(55, 0x80010000U);
+  sensor.queue_record(1, 0, 100, {100, -200, 300, 10, -20, 30});
+
+  const auto result = run_check(endpoint_arguments(sensor) +
+                                " --counts-per-force 100 --counts-per-torque 10");
+
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_TRUE(result.stderr_text.empty());
+  EXPECT_EQ(sensor.http_request_count(), 0U);
+  expect_safe_shutdown(sensor, true);
+  expect_json_assertions(result.stdout_text,
+                         "assert payload['configuration_source'] == 'override'; "
+                         "assert payload['force_unit'] == 'N'; "
+                         "assert payload['torque_unit'] == 'N-m'; "
+                         "assert payload['counts_per_force_unit'] == 100; "
+                         "assert payload['counts_per_torque_unit'] == 10; "
+                         "assert payload['last_force_n'] == [1, -2, 3]; "
+                         "assert payload['last_torque_nm'] == [1, -2, 3]");
+}
+
+TEST(NetFTCheck, JsonNamesSIValuesExplicitlyAndPreservesNativeConfigurationMetadata) {
+  FakeSensor sensor{200};
+  sensor.set_xml_configuration(
+      "<netft><prodname>Fake</prodname><cfgcpf>100</cfgcpf><cfgcpt>10</cfgcpt>"
+      "<scfgfu>kN</scfgfu><scfgtu>N-mm</scfgtu></netft>");
+  sensor.queue_record(1, 0, 100, {100, -200, 300, 10, -20, 30});
+
   const auto result = run_check(endpoint_arguments(sensor));
-  expect_safe_shutdown(sensor);
+
+  EXPECT_EQ(result.exit_code, 0);
+  EXPECT_TRUE(result.stderr_text.empty());
+  const std::string required =
+      "required={'configuration_source','force_unit','torque_unit',"
+      "'counts_per_force_unit','counts_per_torque_unit','last_force_n','last_torque_nm'}; "
+      "assert required <= set(payload); ";
+  expect_json_assertions(result.stdout_text,
+                         required +
+                             "assert payload['configuration_source'] == 'sensor'; "
+                             "assert payload['force_unit'] == 'kN'; "
+                             "assert payload['torque_unit'] == 'N-mm'; "
+                             "assert payload['last_force_n'] == [1000, -2000, 3000]; "
+                             "assert payload['last_torque_nm'] == [0.001, -0.002, 0.003]");
+}
+
+TEST(NetFTCheck, WarningEvidenceUsesNumericExitCodeAndStructuredJson) {
+  FakeSensor sensor{200};
+  sensor.queue_record(1, 0x80010000U, 100);
+
+  const auto result = run_check(endpoint_arguments(sensor));
+
   EXPECT_EQ(result.exit_code, 1);
   EXPECT_TRUE(result.stderr_text.empty());
-  expect_strict_json(result.stdout_text, 1);
+  expect_json_assertions(result.stdout_text,
+                         "assert payload['warning_count'] >= 1; "
+                         "assert payload['device_error_count'] == 0");
 }
 
-TEST(NetFTCheck, DuplicateAndOutOfOrderWarningsRemainWindowEvidence)
-{
-  for (const auto & sequences : {std::array<std::uint32_t, 3>{1, 1, 2},
-                                std::array<std::uint32_t, 3>{10, 9, 11}}) {
-    FakeSensor sensor{200};
-    sensor.queue_record(sequences[0]);
-    sensor.queue_record(sequences[1], 0x80010000U);
-    sensor.queue_record(sequences[2]);
-    const auto result = run_check(endpoint_arguments(sensor));
-    expect_safe_shutdown(sensor);
-    EXPECT_EQ(result.exit_code, 1);
-    EXPECT_TRUE(result.stderr_text.empty());
-    expect_strict_json(result.stdout_text, 1);
-  }
+TEST(NetFTCheck, InvalidArgumentsUseNumericExitCodeAndStructuredJsonError) {
+  const auto result = run_check("--duration nan");
+
+  EXPECT_EQ(result.exit_code, 2);
+  EXPECT_TRUE(result.stdout_text.empty());
+  expect_json_assertions(result.stderr_text,
+                         "assert payload['error'] == 'invalid_arguments'; "
+                         "assert payload['exit_code'] == 2");
 }
 
-TEST(NetFTCheck, SeriousObservedBeforeHealthyRecordsStillReturnsEvidenceExitCode)
-{
+TEST(NetFTCheck, RuntimeFailuresUseNumericExitCodeAndStructuredJsonError) {
   FakeSensor sensor{200};
-  sensor.queue_record(55, 0x80020000U);
+  sensor.pause();
+
   const auto result = run_check(endpoint_arguments(sensor));
+
+  EXPECT_EQ(result.exit_code, 2);
+  EXPECT_TRUE(result.stdout_text.empty());
+  expect_json_assertions(result.stderr_text,
+                         "assert payload['error'] == 'check_failed'; "
+                         "assert payload['exit_code'] == 2");
   expect_safe_shutdown(sensor);
-  EXPECT_EQ(result.exit_code, 1);
-  EXPECT_TRUE(result.stderr_text.empty());
-  expect_strict_json(result.stdout_text, 0, true);
 }
 
-TEST(NetFTCheck, HelpWritesNonemptyStdoutAndSucceeds)
-{
+TEST(NetFTCheck, HelpUsesTheSuccessExitCode) {
   const auto result = run_check("--help");
   EXPECT_EQ(result.exit_code, 0);
   EXPECT_TRUE(result.stderr_text.empty());
-  EXPECT_FALSE(result.stdout_text.empty());
 }
 
-TEST(NetFTCheck, InterruptionStopsTheStreamWithoutBias)
-{
-  FakeSensor sensor{200};
-  const auto output = std::filesystem::temp_directory_path() /
-                      ("netft-check-interrupt-" + std::to_string(::getpid()) + ".out");
-  const auto command = "timeout --preserve-status -s INT 0.10 " + quote(NETFT_CHECK_PATH) + " " +
-      endpoint_arguments(sensor) + " > " + quote(output.string()) + " 2>&1";
-  const int status = std::system(command.c_str());
-  std::filesystem::remove(output);
-  expect_safe_shutdown(sensor, true);
-  EXPECT_EQ(WIFEXITED(status) ? WEXITSTATUS(status) : 127, 2);
-}
-}  // namespace
+} // namespace

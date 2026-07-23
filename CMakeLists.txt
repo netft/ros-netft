@@ -54,7 +54,7 @@ target_include_directories(netft_core PUBLIC
 )
 
 add_executable(netft_check src/check_main.cpp)
-target_link_libraries(netft_check PRIVATE netft_core Threads::Threads)
+target_link_libraries(netft_check PRIVATE netft_ros_support netft_sdk_core)
 
 if(NETFT_CORE_ONLY)
   enable_testing()
