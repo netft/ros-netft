@@ -9,7 +9,7 @@ option(NETFT_CORE_ONLY "Build only the ROS-neutral C++ core" OFF)
 option(NETFT_INSTALL_TEST_TOOLS "Install private integration-test tools" OFF)
 
 find_package(Threads REQUIRED)
-find_package(CURL 7.62 REQUIRED)
+find_package(CURL 7.63 REQUIRED)
 
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles(

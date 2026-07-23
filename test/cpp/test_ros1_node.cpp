@@ -31,6 +31,10 @@ TEST(NetFTRos1Node, UsesAtiAndSensorDiscoveryDefaults)
 
 TEST(NetFTRos1Node, MapsEveryAdapterParameterWithManualCalibration)
 {
+  int argc = 0;
+  if (!ros::isInitialized()) {
+    ros::init(argc, nullptr, "netft_ros1_node_test", ros::init_options::AnonymousName);
+  }
   if (!ros::master::check()) {
     GTEST_SKIP() << "a ROS master is required for ROS 1 graph assertions";
   }

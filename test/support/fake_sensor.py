@@ -40,7 +40,7 @@ class _ConfigurationHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(CALIBRATION_XML)
 
-    def log_message(self, format, *args):
+    def log_message(self, _format, *args):
         pass
 
 

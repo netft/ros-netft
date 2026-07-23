@@ -9,7 +9,7 @@ platforms = ["linux-64"]
 channel-priority = "strict"
 
 [dependencies]
-libcurl = ">=7.62"
+libcurl = ">=7.63"
 python = ">=3.8"
 pytest = ">=8,<9"
 pytest-timeout = ">=2,<3"
