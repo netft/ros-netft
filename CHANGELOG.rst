@@ -2,6 +2,10 @@
 Changelog for package netft_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.1 (2026-07-23)
+------------------
+* Update the private ``netft-cpp`` core snapshot to v0.1.3 so repeated signal interruptions cannot extend the configured UDP receive timeout.
+
 0.3.0 (2026-07-22)
 ------------------
 * Add a private ``netft-cpp`` v0.1.2 core snapshot and remove the duplicate original runtime.
