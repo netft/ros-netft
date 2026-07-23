@@ -2,13 +2,14 @@
 
 [workspace]
 name = "ros-netft"
-version = "0.2.2"
+version = "0.3.0"
 description = "Native ROS 1, ROS 2, and ros2_control driver for ATI Net F/T RDT sensors"
 channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64"]
 channel-priority = "strict"
 
 [dependencies]
+libcurl = ">=7.62"
 python = ">=3.8"
 pytest = ">=8,<9"
 pytest-timeout = ">=2,<3"

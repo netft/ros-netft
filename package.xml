@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>netft_driver</name>
-  <version>0.2.2</version>
+  <version>0.3.0</version>
   <description>Native ROS 1, ROS 2, and ros2_control driver for ATI Net F/T RDT sensors.</description>
   <maintainer email="hanxudong159@126.com">Xudong Han</maintainer>
   <license>MIT</license>
