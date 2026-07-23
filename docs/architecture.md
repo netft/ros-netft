@@ -61,11 +61,12 @@ joins the worker, and sends Stop Streaming when possible.
 
 Standalone adapters publish from the receiver callback and keep ROS timers,
 services, logging, and message conversion outside the core. The plugin's
-receiver callback writes complete samples into
-`realtime_tools::RealtimeBuffer<WrenchSample>`. Its controller-loop `read()`
-uses `RealtimeBuffer::readFromRT()` and performs no network I/O, reconnect,
-service work, or unbounded mutex wait. A controller loop may consume the same
-current sample more than once when it runs faster than the sensor stream.
+receiver callback immediately converts each accepted native-unit sample to SI
+and writes the result into `realtime_tools::RealtimeBuffer<SiSample>`. Its
+controller-loop `read()` uses `RealtimeBuffer::readFromRT()`, copies SI values
+only, and performs no unit conversion, network I/O, reconnect, service work,
+or unbounded mutex wait. A controller loop may consume the same current sample
+more than once when it runs faster than the sensor stream.
 
 This separation is control-loop-friendly, but it is not an end-to-end
 hard-real-time guarantee: UDP transport, Linux scheduling, controller code,
@@ -187,12 +188,14 @@ The package uses one format-3 manifest with ROS-version conditions. ROS 1 uses
 catkin and roscpp. ROS 2 uses ament_cmake, rclcpp, hardware_interface,
 pluginlib, and realtime_tools.
 
-`include/netft_driver/ros2_control_compat.hpp` isolates the ros2_control API
-difference. Hardware-interface major versions below 4 use the legacy exported
-state-interface path required by Humble; version 4 and later use
-framework-managed state interfaces. CMake selects this at compile time from
-the discovered `hardware_interface` version. Transport and fault semantics do
-not branch on a ROS distribution name.
+The private `src/ros/ros2_control_compat.hpp` isolates the ros2_control API
+difference, while private test-access declarations stay in
+`src/ros/ros2_control_test_access.hpp`; neither header is installed. Hardware-
+interface major versions below 4 use the legacy exported state-interface path
+required by Humble; version 4 and later use framework-managed state interfaces.
+CMake selects this at compile time from the discovered `hardware_interface`
+version. Transport and fault semantics do not branch on a ROS distribution
+name.
 
 ## Test boundaries
 

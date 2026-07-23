@@ -146,10 +146,11 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
   add_library(netft_ros2_control SHARED src/netft_hardware_interface.cpp)
   target_compile_definitions(netft_ros2_control PRIVATE
     ${NETFT_ROS2_CONTROL_API_DEFINITION})
-  target_include_directories(netft_ros2_control PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+  target_include_directories(netft_ros2_control PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
   target_link_libraries(netft_ros2_control PRIVATE
-    netft_core
+    netft_ros_support
+    netft_sdk_core
     ${hardware_interface_TARGETS}
     ${pluginlib_TARGETS}
     ${rclcpp_TARGETS}
@@ -226,14 +227,22 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
     ament_add_gtest(netft_hardware_interface
       test/cpp/test_hardware_interface.cpp
       test/cpp/support/fake_sensor.cpp
+      test/core/support/fake_http_server.cpp
+      test/core/support/fake_sensor.cpp
     )
     if(TARGET netft_hardware_interface)
       target_compile_definitions(netft_hardware_interface PRIVATE
         ${NETFT_ROS2_CONTROL_API_DEFINITION}
         NETFT_ROS2_CONTROL_TESTING)
+      target_include_directories(netft_hardware_interface PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/core
+        ${NETFT_SNAPSHOT_SOURCE_DIR}/src)
       target_link_libraries(netft_hardware_interface
         netft_ros2_control
-        netft_core
+        netft_ros_support
+        netft_sdk_core
         ${hardware_interface_TARGETS}
         ${rclcpp_TARGETS}
         ${std_srvs_TARGETS}

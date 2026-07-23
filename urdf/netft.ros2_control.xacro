@@ -1,14 +1,18 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="netft_ros2_control" params="name sensor_name sensor_ip sensor_port:=49152 counts_per_force:=1000000 counts_per_torque:=1000000 receive_timeout:=0.1 activation_timeout:=2.0 bias_service:=''">
+  <xacro:macro name="netft_ros2_control" params="name sensor_name sensor_ip sensor_port:=49152 http_port:=80 use_sensor_calibration:=true counts_per_force:=1000000 counts_per_torque:=1000000 receive_timeout:=0.1 configuration_connect_timeout:=0.5 configuration_timeout:=1.0 activation_timeout:=2.0 bias_service:=''">
     <ros2_control name="${name}" type="sensor">
       <hardware>
         <plugin>netft_driver/NetFTHardwareInterface</plugin>
         <param name="sensor_ip">${sensor_ip}</param>
         <param name="sensor_port">${sensor_port}</param>
+        <param name="http_port">${http_port}</param>
+        <param name="use_sensor_calibration">${use_sensor_calibration}</param>
         <param name="counts_per_force">${counts_per_force}</param>
         <param name="counts_per_torque">${counts_per_torque}</param>
         <param name="receive_timeout">${receive_timeout}</param>
+        <param name="configuration_connect_timeout">${configuration_connect_timeout}</param>
+        <param name="configuration_timeout">${configuration_timeout}</param>
         <param name="activation_timeout">${activation_timeout}</param>
         <xacro:if value="${bias_service != ''}">
           <param name="bias_service">${bias_service}</param>
