@@ -91,6 +91,7 @@ std::string endpoint_arguments(const FakeSensor &sensor) {
 }
 
 void expect_safe_shutdown(const FakeSensor &sensor, bool exact = false) {
+  ASSERT_TRUE(sensor.wait_for_command(Command::StopStreaming));
   const auto commands = sensor.commands();
   ASSERT_FALSE(commands.empty());
   EXPECT_EQ(commands.back(), Command::StopStreaming);
