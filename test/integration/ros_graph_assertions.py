@@ -98,9 +98,9 @@ def assert_diagnostics_output(
     )
     if configured_publish_rate is not None:
         values = dict(_diagnostic_pairs(messages[-1]))
-        publish_rate = float(values["publish_rate_hz"])
+        publish_rate = float(values.get("delivery_rate_hz", values.get("publish_rate_hz")))
         receive_rate = float(values["receive_rate_hz"])
-        dropped = int(values["rate_dropped_count"])
+        dropped = int(values.get("rate_limited_count", values.get("rate_dropped_count")))
         assert configured_publish_rate * 0.35 <= publish_rate <= configured_publish_rate * 1.4
         assert publish_rate < receive_rate
         assert dropped > 0

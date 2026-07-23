@@ -199,21 +199,30 @@ main() {
 
   PYTHONPATH="$repo_root" python3 "$repo_root/test/integration/fake_sensor_process.py" \
     --port-file "$temp_root/sensor.port" \
+    --http-port-file "$temp_root/http.port" \
     --commands-file "$temp_root/commands.json" \
     --rate 200 >"$temp_root/sensor.log" 2>&1 &
   sensor_pid=$!
   for _ in $(seq 1 100); do
-    [[ -s "$temp_root/sensor.port" ]] && break
+    [[ -s "$temp_root/sensor.port" && -s "$temp_root/http.port" ]] && break
     sleep 0.05
   done
+  if [[ ! -s "$temp_root/sensor.port" || ! -s "$temp_root/http.port" ]]; then
+    cat "$temp_root/sensor.log" >&2
+    return 1
+  fi
   sensor_port="$(cat "$temp_root/sensor.port")"
+  http_port="$(cat "$temp_root/http.port")"
 
   rosrun netft_driver netft_node __ns:=/netft_smoke wrench:=remapped_wrench \
     _sensor_ip:=127.0.0.1 \
     _sensor_port:="$sensor_port" \
+    _http_port:="$http_port" \
     _frame_id:=smoke_frame _wrench_topic:=wrench _bias_service:=bias \
-    _counts_per_force:=2000000.0 _counts_per_torque:=4000000.0 _publish_rate:=50.0 \
-    _receive_timeout:=0.8 _reconnect_initial_delay:=0.11 _reconnect_max_delay:=0.37 \
+    _use_sensor_calibration:=true _publish_rate:=50.0 \
+    _receive_timeout:=0.8 _configuration_connect_timeout:=0.23 \
+    _configuration_timeout:=0.71 \
+    _reconnect_initial_delay:=0.11 _reconnect_max_delay:=0.37 \
     _expected_rdt_rate:=200.0 \
     _diagnostics_rate:=5.0 _rate_tolerance:=0.35 _publish_on_error:=true \
     >"$temp_root/node.log" 2>&1 &
@@ -242,7 +251,7 @@ main() {
     >"$temp_root/wrench.txt"
   python3 "$repo_root/test/integration/ros_graph_assertions.py" wrench \
     "$temp_root/wrench.txt" --ros-version 1 --frame-id smoke_frame \
-    --axes 0.00005 -0.0001 0.00015 0.0000025 -0.000005 0.0000075
+    --axes 100.0 -200.0 300.0 0.001 -0.002 0.003
 
   sleep 1
   timeout --kill-after=2s 10s rostopic echo -n 5 /diagnostics \
@@ -251,11 +260,16 @@ main() {
   grep -q "hardware_id: \"127.0.0.1:$sensor_port\"" "$temp_root/diagnostics.txt"
   python3 "$repo_root/test/integration/ros_graph_assertions.py" diagnostics \
     "$temp_root/diagnostics.txt" --ros-version 1 \
-    --status-header "$repo_root/include/netft_driver/status.hpp" \
+    --status-header "$repo_root/src/ros/diagnostics.hpp" \
     --expected-rate 5.0 --configured-publish-rate 50.0 \
     --expected-value "sensor=127.0.0.1:$sensor_port" \
     --expected-value expected_receive_rate_hz=200.0 \
-    --expected-value rate_tolerance=0.350
+    --expected-value rate_tolerance=0.350 \
+    --expected-value configuration_source=sensor \
+    --expected-value force_unit=kN \
+    --expected-value torque_unit=N-mm \
+    --expected-value counts_per_force_unit=1000 \
+    --expected-value counts_per_torque_unit=10
 
   timeout --kill-after=2s 10s rosservice call /netft_smoke/bias '{}' \
     >"$temp_root/bias.txt"

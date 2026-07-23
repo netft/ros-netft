@@ -89,7 +89,10 @@ if(NETFT_ROS_VERSION STREQUAL "1")
     CATKIN_DEPENDS roscpp geometry_msgs std_srvs diagnostic_msgs)
   add_executable(netft_node_cpp src/ros1_node.cpp)
   set_target_properties(netft_node_cpp PROPERTIES OUTPUT_NAME netft_node)
-  target_link_libraries(netft_node_cpp PRIVATE netft_core ${catkin_LIBRARIES})
+  target_link_libraries(netft_node_cpp PRIVATE
+    netft_ros_support
+    netft_sdk_core
+    ${catkin_LIBRARIES})
   target_include_directories(netft_node_cpp PRIVATE ${catkin_INCLUDE_DIRS})
   if(CATKIN_ENABLE_TESTING)
     catkin_run_tests_target(
@@ -119,7 +122,10 @@ if(NETFT_ROS_VERSION STREQUAL "1")
   if(CATKIN_ENABLE_TESTING)
     catkin_add_gtest(netft_ros1_node test/cpp/test_ros1_node.cpp)
     if(TARGET netft_ros1_node)
-      target_link_libraries(netft_ros1_node netft_core ${catkin_LIBRARIES})
+      target_link_libraries(netft_ros1_node
+        netft_ros_support
+        netft_sdk_core
+        ${catkin_LIBRARIES})
       target_include_directories(netft_ros1_node PRIVATE ${catkin_INCLUDE_DIRS})
     endif()
   endif()
@@ -156,7 +162,8 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
   add_executable(netft_node_cpp src/ros2_node.cpp)
   set_target_properties(netft_node_cpp PROPERTIES OUTPUT_NAME netft_node)
   target_link_libraries(netft_node_cpp PRIVATE
-    netft_core
+    netft_ros_support
+    netft_sdk_core
     ${rclcpp_TARGETS}
     ${geometry_msgs_TARGETS}
     ${std_srvs_TARGETS}
@@ -208,7 +215,8 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
     ament_add_gtest(netft_ros2_node test/cpp/test_ros2_node.cpp)
     if(TARGET netft_ros2_node)
       target_link_libraries(netft_ros2_node
-        netft_core
+        netft_ros_support
+        netft_sdk_core
         ${rclcpp_TARGETS}
         ${geometry_msgs_TARGETS}
         ${std_srvs_TARGETS}

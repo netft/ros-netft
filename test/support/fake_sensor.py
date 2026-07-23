@@ -5,6 +5,7 @@ import threading
 import time
 
 from enum import IntEnum
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class Command(IntEnum):
@@ -16,6 +17,31 @@ class Command(IntEnum):
 
 REQUEST_STRUCT = struct.Struct(">HHI")
 RECORD_STRUCT = struct.Struct(">IIIiiiiii")
+CALIBRATION_XML = b"""<?xml version="1.0"?>
+<netft>
+  <prodname>Fake Net F/T</prodname>
+  <cfgcpf>1000</cfgcpf>
+  <cfgcpt>10</cfgcpt>
+  <scfgfu>kN</scfgfu>
+  <scfgtu>N-mm</scfgtu>
+</netft>
+"""
+
+
+class _ConfigurationHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/netftapi2.xml":
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/xml")
+        self.send_header("Content-Length", str(len(CALIBRATION_XML)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(CALIBRATION_XML)
+
+    def log_message(self, format, *args):
+        pass
 
 
 class FakeNetFTSensor:
@@ -24,10 +50,14 @@ class FakeNetFTSensor:
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.bind(("127.0.0.1", 0))
         self._socket.settimeout(min(0.002, 0.25 / self.rate_hz))
+        self._http_server = HTTPServer(
+            ("127.0.0.1", 0), _ConfigurationHandler, bind_and_activate=True
+        )
         self._stop = threading.Event()
         self._enabled = threading.Event()
         self._enabled.set()
         self._thread = None
+        self._http_thread = None
         self._streaming = False
         self._client_address = None
         self._requests = []
@@ -48,6 +78,10 @@ class FakeNetFTSensor:
         return self._socket.getsockname()[1]
 
     @property
+    def http_port(self):
+        return self._http_server.server_address[1]
+
+    @property
     def commands(self):
         with self._commands_lock:
             return tuple(command for command, sample_count in self._requests)
@@ -61,14 +95,26 @@ class FakeNetFTSensor:
         self._thread = threading.Thread(
             target=self._run, name="fake-netft", daemon=True
         )
+        self._http_thread = threading.Thread(
+            target=self._http_server.serve_forever,
+            kwargs={"poll_interval": 0.01},
+            name="fake-netft-http",
+            daemon=True,
+        )
         self._thread.start()
+        self._http_thread.start()
         return self
 
     def close(self):
         self._stop.set()
         self._socket.close()
+        if self._http_thread is not None:
+            self._http_server.shutdown()
+        self._http_server.server_close()
         if self._thread is not None:
             self._thread.join(timeout=1.0)
+        if self._http_thread is not None:
+            self._http_thread.join(timeout=1.0)
 
     def __enter__(self):
         return self.start()

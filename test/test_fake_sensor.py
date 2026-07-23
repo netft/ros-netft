@@ -1,4 +1,6 @@
 import socket
+import urllib.request
+import xml.etree.ElementTree as ET
 
 from test.support.fake_sensor import (
     Command,
@@ -32,3 +34,17 @@ def test_fake_sensor_applies_software_bias_to_subsequent_records():
                     break
             else:
                 raise AssertionError("fake sensor did not apply its software bias")
+
+
+def test_fake_sensor_serves_non_si_calibration_on_loopback_http():
+    with FakeNetFTSensor(rate_hz=200.0) as sensor:
+        with urllib.request.urlopen(
+            f"http://{sensor.host}:{sensor.http_port}/netftapi2.xml", timeout=1.0
+        ) as response:
+            configuration = ET.fromstring(response.read())
+
+    assert configuration.findtext("prodname") == "Fake Net F/T"
+    assert configuration.findtext("cfgcpf") == "1000"
+    assert configuration.findtext("cfgcpt") == "10"
+    assert configuration.findtext("scfgfu") == "kN"
+    assert configuration.findtext("scfgtu") == "N-mm"
