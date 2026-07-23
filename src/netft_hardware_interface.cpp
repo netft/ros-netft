@@ -32,6 +32,14 @@
 
 #ifdef NETFT_ROS2_CONTROL_TESTING
 #include "ros/ros2_control_test_access.hpp"
+
+#if defined(_WIN32)
+#define NETFT_ROS2_CONTROL_TEST_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__) || defined(__clang__)
+#define NETFT_ROS2_CONTROL_TEST_EXPORT __attribute__((visibility("default")))
+#else
+#define NETFT_ROS2_CONTROL_TEST_EXPORT
+#endif
 #endif
 
 namespace netft_driver {
@@ -787,66 +795,73 @@ int auxiliary_thread_count() noexcept
 }  // namespace netft_driver
 
 #ifdef NETFT_ROS2_CONTROL_TESTING
-extern "C" void netft_ros2_control_test_force_initial_sample_once() noexcept
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void
+netft_ros2_control_test_force_initial_sample_once() noexcept
 {
   netft_driver::ros2_control_test_access::detail::force_initial_sample_once();
 }
 
-extern "C" void netft_ros2_control_test_fail_state_write_once_at(
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void netft_ros2_control_test_fail_state_write_once_at(
   const std::size_t axis) noexcept
 {
   netft_driver::ros2_control_test_access::detail::fail_state_write_once_at(axis);
 }
 
-extern "C" void netft_ros2_control_test_latch_active_fault(
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void netft_ros2_control_test_latch_active_fault(
   const netft_driver::ros2_control_test_access::FaultCode fault) noexcept
 {
   netft_driver::ros2_control_test_access::detail::latch_active_fault(fault);
 }
 
-extern "C" bool netft_ros2_control_test_read_active_instance() noexcept
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT bool
+netft_ros2_control_test_read_active_instance() noexcept
 {
   return netft_driver::ros2_control_test_access::detail::read_active_instance();
 }
 
-extern "C" netft_driver::ros2_control_test_access::FaultCode
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT netft_driver::ros2_control_test_access::FaultCode
 netft_ros2_control_test_active_fault_code() noexcept
 {
   return netft_driver::ros2_control_test_access::detail::active_fault_code();
 }
 
-extern "C" netft_driver::ros2_control_test_access::FaultCode
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT netft_driver::ros2_control_test_access::FaultCode
 netft_ros2_control_test_active_client_fault_code() noexcept
 {
   return netft_driver::ros2_control_test_access::detail::active_client_fault_code();
 }
 
-extern "C" netft_driver::ros2_control_test_access::FaultCode
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT netft_driver::ros2_control_test_access::FaultCode
 netft_ros2_control_test_active_latched_fault_code() noexcept
 {
   return netft_driver::ros2_control_test_access::detail::active_latched_fault_code();
 }
 
-extern "C" netft_driver::ros2_control_test_access::ActivityCounters
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT netft_driver::ros2_control_test_access::ActivityCounters
 netft_ros2_control_test_active_activity_counters() noexcept
 {
   return netft_driver::ros2_control_test_access::detail::active_activity_counters();
 }
 
-extern "C" bool netft_ros2_control_test_interface_write_fault_latched() noexcept
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT bool
+netft_ros2_control_test_interface_write_fault_latched() noexcept
 {
   return netft_driver::ros2_control_test_access::detail::interface_write_fault_latched();
 }
 
-extern "C" void netft_ros2_control_test_throw_executor_cancel_once() noexcept
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void
+netft_ros2_control_test_throw_executor_cancel_once() noexcept
 {
   netft_driver::ros2_control_test_access::detail::throw_executor_cancel_once();
 }
 
-extern "C" int netft_ros2_control_test_auxiliary_thread_count() noexcept
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT int
+netft_ros2_control_test_auxiliary_thread_count() noexcept
 {
   return netft_driver::ros2_control_test_access::detail::auxiliary_thread_count();
 }
+
+#undef NETFT_ROS2_CONTROL_TEST_EXPORT
 #endif
 
 PLUGINLIB_EXPORT_CLASS(

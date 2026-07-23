@@ -156,6 +156,9 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
   endif()
 
   function(netft_configure_ros2_control_target target)
+    set_target_properties(${target} PROPERTIES
+      CXX_VISIBILITY_PRESET hidden
+      VISIBILITY_INLINES_HIDDEN YES)
     target_compile_definitions(${target} PRIVATE
       ${NETFT_ROS2_CONTROL_API_DEFINITION})
     target_include_directories(${target} PRIVATE

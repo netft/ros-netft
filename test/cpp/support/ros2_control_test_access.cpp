@@ -21,16 +21,23 @@ int find_testing_library(dl_phdr_info * info, std::size_t, void * data) noexcept
   return 0;
 }
 
+void * testing_library_handle() noexcept
+{
+  static void * const handle = [] {
+    const char * library_path = nullptr;
+    (void)::dl_iterate_phdr(find_testing_library, &library_path);
+    if (library_path == nullptr) std::abort();
+    void * const opened = ::dlopen(library_path, RTLD_LAZY | RTLD_NOLOAD);
+    if (opened == nullptr) std::abort();
+    return opened;
+  }();
+  return handle;
+}
+
 template<typename Function>
 Function resolve(const char * name) noexcept
 {
-  const char * library_path = nullptr;
-  (void)::dl_iterate_phdr(find_testing_library, &library_path);
-  if (library_path == nullptr) std::abort();
-  const auto handle = ::dlopen(library_path, RTLD_LAZY | RTLD_NOLOAD);
-  if (handle == nullptr) std::abort();
-  const auto symbol = ::dlsym(handle, name);
-  (void)::dlclose(handle);
+  const auto symbol = ::dlsym(testing_library_handle(), name);
   if (symbol == nullptr) std::abort();
   return reinterpret_cast<Function>(symbol);
 }
