@@ -13,27 +13,27 @@ find_package(CURL 7.62 REQUIRED)
 
 set(NETFT_SNAPSHOT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/core")
 set(NETFT_SNAPSHOT_SOURCES
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/types.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/status.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/discovery.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/client.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/client_impl.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/fault_latch.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/posix_transport.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/protocol.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/sequence.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/xml_config.cpp
+  src/core/src/types.cpp
+  src/core/src/status.cpp
+  src/core/src/discovery.cpp
+  src/core/src/client.cpp
+  src/core/src/detail/client_impl.cpp
+  src/core/src/detail/fault_latch.cpp
+  src/core/src/detail/posix_transport.cpp
+  src/core/src/detail/protocol.cpp
+  src/core/src/detail/sequence.cpp
+  src/core/src/detail/xml_config.cpp
 )
 
-add_library(netft_sdk_core STATIC ${NETFT_SNAPSHOT_SOURCES})
-set_target_properties(netft_sdk_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_features(netft_sdk_core PUBLIC cxx_std_17)
-target_compile_definitions(netft_sdk_core PRIVATE NETFT_BUILDING_LIBRARY)
-target_include_directories(netft_sdk_core
+add_library(netft_core STATIC ${NETFT_SNAPSHOT_SOURCES})
+set_target_properties(netft_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(netft_core PUBLIC cxx_std_17)
+target_compile_definitions(netft_core PRIVATE NETFT_BUILDING_LIBRARY)
+target_include_directories(netft_core
   PUBLIC ${NETFT_SNAPSHOT_SOURCE_DIR}/include
   PRIVATE ${NETFT_SNAPSHOT_SOURCE_DIR}/src
 )
-target_link_libraries(netft_sdk_core PUBLIC Threads::Threads CURL::libcurl)
+target_link_libraries(netft_core PUBLIC Threads::Threads CURL::libcurl)
 
 add_library(netft_ros_support STATIC
   src/ros/unit_conversion.cpp
@@ -44,17 +44,10 @@ target_include_directories(netft_ros_support
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${NETFT_SNAPSHOT_SOURCE_DIR}/include)
-target_link_libraries(netft_ros_support PUBLIC netft_sdk_core)
-
-add_library(netft_core STATIC src/protocol.cpp src/status.cpp src/client.cpp)
-set_target_properties(netft_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_features(netft_core PUBLIC cxx_std_17)
-target_include_directories(netft_core PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-)
+target_link_libraries(netft_ros_support PUBLIC netft_core)
 
 add_executable(netft_check src/check_main.cpp)
-target_link_libraries(netft_check PRIVATE netft_ros_support netft_sdk_core)
+target_link_libraries(netft_check PRIVATE netft_ros_support netft_core)
 
 if(NETFT_CORE_ONLY)
   enable_testing()
@@ -84,14 +77,12 @@ endif()
 if(NETFT_ROS_VERSION STREQUAL "1")
   find_package(catkin REQUIRED COMPONENTS roscpp geometry_msgs std_srvs diagnostic_msgs)
   catkin_package(
-    INCLUDE_DIRS include
-    LIBRARIES netft_core
     CATKIN_DEPENDS roscpp geometry_msgs std_srvs diagnostic_msgs)
   add_executable(netft_node_cpp src/ros1_node.cpp)
   set_target_properties(netft_node_cpp PROPERTIES OUTPUT_NAME netft_node)
   target_link_libraries(netft_node_cpp PRIVATE
     netft_ros_support
-    netft_sdk_core
+    netft_core
     ${catkin_LIBRARIES})
   target_include_directories(netft_node_cpp PRIVATE ${catkin_INCLUDE_DIRS})
   if(CATKIN_ENABLE_TESTING)
@@ -114,17 +105,14 @@ if(NETFT_ROS_VERSION STREQUAL "1")
     FILES config/netft_ros1.yaml
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
   )
-  install(TARGETS netft_core ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
   install(TARGETS netft_node_cpp netft_check
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
-  install(DIRECTORY include/${PROJECT_NAME}/
-    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
   if(CATKIN_ENABLE_TESTING)
     catkin_add_gtest(netft_ros1_node test/cpp/test_ros1_node.cpp)
     if(TARGET netft_ros1_node)
       target_link_libraries(netft_ros1_node
         netft_ros_support
-        netft_sdk_core
+        netft_core
         ${catkin_LIBRARIES})
       target_include_directories(netft_ros1_node PRIVATE ${catkin_INCLUDE_DIRS})
     endif()
@@ -151,7 +139,7 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
       ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(${target} PRIVATE
       netft_ros_support
-      netft_sdk_core
+      netft_core
       ${hardware_interface_TARGETS}
       ${pluginlib_TARGETS}
       ${rclcpp_TARGETS}
@@ -169,7 +157,7 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
   set_target_properties(netft_node_cpp PROPERTIES OUTPUT_NAME netft_node)
   target_link_libraries(netft_node_cpp PRIVATE
     netft_ros_support
-    netft_sdk_core
+    netft_core
     ${rclcpp_TARGETS}
     ${geometry_msgs_TARGETS}
     ${std_srvs_TARGETS}
@@ -257,7 +245,7 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
     if(TARGET netft_ros2_node)
       target_link_libraries(netft_ros2_node
         netft_ros_support
-        netft_sdk_core
+        netft_core
         ${rclcpp_TARGETS}
         ${geometry_msgs_TARGETS}
         ${std_srvs_TARGETS}
@@ -266,7 +254,6 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
     endif()
     ament_add_gtest(netft_hardware_interface
       test/cpp/test_hardware_interface.cpp
-      test/cpp/support/fake_sensor.cpp
       test/cpp/support/ros2_control_test_access.cpp
       test/core/support/fake_http_server.cpp
       test/core/support/fake_sensor.cpp
@@ -277,13 +264,12 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
       target_compile_definitions(netft_hardware_interface PRIVATE
         ${NETFT_ROS2_CONTROL_API_DEFINITION})
       target_include_directories(netft_hardware_interface PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/test/core
         ${NETFT_SNAPSHOT_SOURCE_DIR}/src)
       target_link_libraries(netft_hardware_interface
         netft_ros_support
-        netft_sdk_core
+        netft_core
         ${CMAKE_DL_LIBS}
         ${hardware_interface_TARGETS}
         ${rclcpp_TARGETS}
@@ -318,9 +304,7 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
       TIMEOUT 30
     )
   endif()
-  install(TARGETS netft_core ARCHIVE DESTINATION lib)
   install(TARGETS netft_node_cpp netft_check DESTINATION lib/${PROJECT_NAME})
-  install(DIRECTORY include/${PROJECT_NAME}/ DESTINATION include/${PROJECT_NAME})
   install(TARGETS netft_ros2_control
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib

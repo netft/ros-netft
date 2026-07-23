@@ -97,7 +97,7 @@ wrench:
 
 
 def test_diagnostics_assertion_matches_core_key_order_rate_and_values(tmp_path):
-    status_header = ROOT / "include/netft_driver/status.hpp"
+    status_header = ROOT / "src/ros/diagnostics.hpp"
     header_text = status_header.read_text(encoding="utf-8")
     key_block = header_text.split("kDiagnosticValueKeys{", 1)[1].split("};", 1)[0]
     keys = [part.split('"', 2)[1] for part in key_block.split(",")]
@@ -108,7 +108,7 @@ def test_diagnostics_assertion_matches_core_key_order_rate_and_values(tmp_path):
             value = {
                 "expected_receive_rate_hz": "200.0",
                 "rate_tolerance": "0.350",
-                "publish_rate_hz": "50.0",
+                "delivery_rate_hz": "50.0",
             }.get(key, "fixture")
             pairs.append(f'- key: "{key}"\n  value: "{value}"')
         messages.append(
@@ -131,7 +131,7 @@ def test_diagnostics_assertion_matches_core_key_order_rate_and_values(tmp_path):
         expected_values={
             "expected_receive_rate_hz": "200.0",
             "rate_tolerance": "0.350",
-            "publish_rate_hz": "50.0",
+            "delivery_rate_hz": "50.0",
         },
     )
 

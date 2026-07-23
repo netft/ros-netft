@@ -6,11 +6,11 @@ operator procedures, and safety guidance.
 
 ## Package boundaries
 
-The active transport implementation is a private snapshot of netft-cpp under `src/core`. It is built as `netft_sdk_core`, uses the `netft` namespace, contains no ROS headers, and is not installed as a public SDK. `netft::Client` is the single client used by the command-line tool, standalone nodes, and ros2_control plugin.
+The active transport implementation is a private snapshot of netft-cpp under `src/core`. It is built as `netft_core`, uses the `netft` namespace, contains no ROS headers, and is not installed as a public SDK. `netft::Client` is the single client used by the command-line tool, standalone nodes, and ros2_control plugin.
 
 ```text
 src/core sources
-└── netft_sdk_core
+└── netft_core
     └── netft_ros_support
         ├── netft_check
         ├── netft_node (ROS 1 or ROS 2)
@@ -181,7 +181,7 @@ name.
 
 ## Test boundaries
 
-The ROS-neutral CTest suite builds `netft_sdk_core` and `netft_ros_support` without ROS and uses GTest for protocol bytes, XML calibration, record parsing, status and sequence semantics, SI conversion, parameter validation, client recovery, shutdown, and the bounded check tool. ROS package GTests cover the native ROS adapters and load the non-installed instrumented hardware plugin, including invalid descriptions, activation, non-blocking reads, every fatal class, persistent latching, lifecycle quiescence and recovery, online bias, and auxiliary-thread cleanup. Installed-package smoke tests load only the production plugin.
+The ROS-neutral CTest suite builds `netft_core` and `netft_ros_support` without ROS and uses GTest for protocol bytes, XML calibration, record parsing, status and sequence semantics, SI conversion, parameter validation, client recovery, shutdown, and the bounded check tool. ROS package GTests cover the native ROS adapters and load the non-installed instrumented hardware plugin, including invalid descriptions, activation, non-blocking reads, every fatal class, persistent latching, lifecycle quiescence and recovery, online bias, and auxiliary-thread cleanup. Installed-package smoke tests load only the production plugin.
 
 Loopback graph smoke tests build and use the installed package. They verify
 standalone topics, services, diagnostics, shutdown, plugin loading, the

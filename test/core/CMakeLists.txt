@@ -13,7 +13,7 @@ function(add_netft_snapshot_test target source)
     ${NETFT_SNAPSHOT_SOURCE_DIR}/src
   )
   target_link_libraries(${target} PRIVATE
-    netft_sdk_core ${NETFT_GTEST_MAIN_TARGET})
+    netft_core ${NETFT_GTEST_MAIN_TARGET})
   add_test(NAME ${target} COMMAND ${target})
 endfunction()
 
@@ -56,7 +56,7 @@ add_library(netft_snapshot_client_impl_test STATIC
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/xml_config.cpp)
 target_include_directories(netft_snapshot_client_impl_test PRIVATE
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src)
-target_link_libraries(netft_snapshot_client_impl_test PUBLIC netft_sdk_core)
+target_link_libraries(netft_snapshot_client_impl_test PUBLIC netft_core)
 
 add_executable(netft_snapshot_client_lifecycle
   test_client_lifecycle.cpp

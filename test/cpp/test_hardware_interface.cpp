@@ -1,5 +1,3 @@
-#include "support/fake_sensor.hpp"
-
 #include "../core/support/fake_sensor.hpp"
 
 #include "ros/ros2_control_test_access.hpp"
@@ -34,6 +32,8 @@ namespace {
 constexpr const char * kHardwareName = "netft_hardware";
 constexpr const char * kSensorName = "netft_sensor";
 constexpr const char * kTestPlugin = "netft_driver/NetFTHardwareInterfaceTesting";
+using Command = netft::detail::Command;
+using FakeSensor = netft::test::FakeSensor;
 using FaultCode = ros2_control_test_access::FaultCode;
 
 std::string urdf(
@@ -217,7 +217,7 @@ struct NetworkActivityCounters {
   std::uint64_t sample_callbacks;
 };
 
-NetworkActivityCounters network_activity(const test::FakeSensor & sensor)
+NetworkActivityCounters network_activity(const FakeSensor & sensor)
 {
   return {
     sensor.commands().size(),
@@ -226,7 +226,7 @@ NetworkActivityCounters network_activity(const test::FakeSensor & sensor)
 }
 
 void expect_no_new_network_activity(
-  const test::FakeSensor & sensor, const NetworkActivityCounters expected)
+  const FakeSensor & sensor, const NetworkActivityCounters expected)
 {
   const auto observed = network_activity(sensor);
   EXPECT_EQ(observed.sensor_commands, expected.sensor_commands);
@@ -258,8 +258,8 @@ std::vector<hardware_interface::LoanedStateInterface> claim_axes(
 
 TEST(NetFTHardwareInterface, LoadsThroughResourceManagerWithExactlySixInterfaces)
 {
-  test::FakeSensor sensor{200};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{200};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   EXPECT_EQ(manager->sensor_components_size(), 1U);
   const auto keys = manager->state_interface_keys();
   EXPECT_EQ(keys, (std::vector<std::string>{
@@ -269,9 +269,9 @@ TEST(NetFTHardwareInterface, LoadsThroughResourceManagerWithExactlySixInterfaces
 
 TEST(NetFTHardwareInterface, RejectsInvalidSensorAndInterfaceContracts)
 {
-  test::FakeSensor sensor;
+  FakeSensor sensor;
   const auto load_fails = [&](const std::vector<std::string> & names, const std::string & extra = {}) {
-    EXPECT_TRUE(manager_rejects(urdf(sensor.host(), sensor.port(), {}, names, extra)));
+    EXPECT_TRUE(manager_rejects(urdf(sensor.host(), sensor.rdt_port(), {}, names, extra)));
   };
   load_fails({"force.x", "force.y", "force.z", "torque.x", "torque.y"});
   load_fails({"force.x", "force.y", "force.z", "torque.x", "torque.y", "torque.y"});
@@ -283,20 +283,20 @@ TEST(NetFTHardwareInterface, RejectsInvalidSensorAndInterfaceContracts)
 
 TEST(NetFTHardwareInterface, RejectsJointGpioAndNonDoubleStateInterfaces)
 {
-  test::FakeSensor sensor;
+  FakeSensor sensor;
   const auto exact_interfaces = std::vector<std::string>{
     "force.x", "force.y", "force.z", "torque.x", "torque.y", "torque.z"};
 
   EXPECT_TRUE(manager_rejects(urdf(
-    sensor.host(), sensor.port(), {}, exact_interfaces,
+    sensor.host(), sensor.rdt_port(), {}, exact_interfaces,
     "<joint name=\"extra_joint\"><state_interface name=\"position\"/></joint>")));
   EXPECT_TRUE(manager_rejects(urdf(
-    sensor.host(), sensor.port(), {}, exact_interfaces,
+    sensor.host(), sensor.rdt_port(), {}, exact_interfaces,
     "<gpio name=\"extra_gpio\"><state_interface name=\"voltage\"/></gpio>")));
   const auto int32_description = urdf(
-    sensor.host(), sensor.port(), {}, exact_interfaces, {}, "int32");
+    sensor.host(), sensor.rdt_port(), {}, exact_interfaces, {}, "int32");
   const auto float_description = urdf(
-    sensor.host(), sensor.port(), {}, exact_interfaces, {}, "float");
+    sensor.host(), sensor.rdt_port(), {}, exact_interfaces, {}, "float");
 #ifdef NETFT_ROS2_CONTROL_LEGACY_API
   // Humble's parser does not retain the data_type attribute for sensor state interfaces.
   EXPECT_FALSE(manager_rejects(int32_description));
@@ -309,7 +309,7 @@ TEST(NetFTHardwareInterface, RejectsJointGpioAndNonDoubleStateInterfaces)
 
 TEST(NetFTHardwareInterface, RejectsEveryInvalidNumericAndEndpointParameter)
 {
-  test::FakeSensor sensor;
+  FakeSensor sensor;
   for (const auto & parameter : std::vector<std::string>{
       "<param name=\"sensor_ip\"> </param>",
       "<param name=\"sensor_port\">0</param>",
@@ -328,14 +328,14 @@ TEST(NetFTHardwareInterface, RejectsEveryInvalidNumericAndEndpointParameter)
       "<param name=\"expected_rdt_rate\">0</param>",
       "<param name=\"rate_tolerance\">-0.1</param>",
       "<param name=\"rate_tolerance\">1.1</param>"}) {
-    EXPECT_TRUE(manager_rejects(urdf(sensor.host(), sensor.port(), parameter)))
+    EXPECT_TRUE(manager_rejects(urdf(sensor.host(), sensor.rdt_port(), parameter)))
       << parameter;
   }
 }
 
 TEST(NetFTHardwareInterface, AutomaticCalibrationIgnoresManualCountsAndPublishesSiAxes)
 {
-  netft::test::FakeSensor sensor{500};
+  FakeSensor sensor{500};
   sensor.set_xml_configuration(
     "<netft><prodname>Native unit sensor</prodname>"
     "<cfgcpf>1000</cfgcpf><cfgcpt>10</cfgcpt>"
@@ -364,7 +364,7 @@ TEST(NetFTHardwareInterface, AutomaticCalibrationIgnoresManualCountsAndPublishes
 
 TEST(NetFTHardwareInterface, ManualCalibrationBuildsNewtonAndNewtonMetreOverride)
 {
-  netft::test::FakeSensor sensor{500};
+  FakeSensor sensor{500};
   sensor.set_xml_configuration({}, 500);
   auto manager = make_manager(urdf(
     sensor.host(), sensor.rdt_port(),
@@ -385,10 +385,10 @@ TEST(NetFTHardwareInterface, ManualCalibrationBuildsNewtonAndNewtonMetreOverride
 
 TEST(NetFTHardwareInterface, ActivationIsBoundedWithoutASample)
 {
-  test::FakeSensor sensor;
+  FakeSensor sensor;
   sensor.pause();
   auto manager = make_manager(urdf(
-    sensor.host(), sensor.port(),
+    sensor.host(), sensor.rdt_port(),
     "<param name=\"activation_timeout\">0.05</param>"
     "<param name=\"receive_timeout\">0.5</param>"));
   auto inactive = inactive_state();
@@ -401,8 +401,8 @@ TEST(NetFTHardwareInterface, ActivationIsBoundedWithoutASample)
 
 TEST(NetFTHardwareInterface, ReadsCurrentCompleteSampleAndMayReuseIt)
 {
-  test::FakeSensor sensor{200};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{200};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   configure_and_activate(*manager);
   auto axes = claim_axes(*manager);
   ASSERT_TRUE(read_ok(*manager));
@@ -433,8 +433,8 @@ class FatalFaultTest : public testing::TestWithParam<FaultInjection> {};
 
 TEST_P(FatalFaultTest, WritesAllNaNsAndStaysLatchedAfterValidTraffic)
 {
-  test::FakeSensor sensor{200};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{200};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   configure_and_activate(*manager);
   auto axes = claim_axes(*manager);
   ASSERT_TRUE(read_ok(*manager));
@@ -474,8 +474,8 @@ TEST_P(FatalFaultTest, WritesAllNaNsAndStaysLatchedAfterValidTraffic)
 
 TEST(NetFTHardwareInterface, RejectsInitialSampleReturnedDuringBufferContention)
 {
-  test::FakeSensor sensor{1000};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{1000};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   configure_and_activate(*manager);
   auto axes = claim_axes(*manager);
 
@@ -487,8 +487,8 @@ TEST(NetFTHardwareInterface, RejectsInitialSampleReturnedDuringBufferContention)
 #ifdef NETFT_ROS2_CONTROL_MODERN_API
 TEST(NetFTHardwareInterface, StateWriteFailureIsPersistentAndInvalidatesEveryAxis)
 {
-  test::FakeSensor sensor{1000};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{1000};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   configure_and_activate(*manager);
   auto axes = claim_axes(*manager);
 
@@ -505,9 +505,9 @@ TEST(NetFTHardwareInterface, StateWriteFailureIsPersistentAndInvalidatesEveryAxi
 
 TEST(NetFTHardwareInterface, DestroyingActiveResourceManagerStopsClient)
 {
-  test::FakeSensor sensor{1000};
+  FakeSensor sensor{1000};
   {
-    auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+    auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
     configure_and_activate(*manager);
     ASSERT_TRUE(sensor.wait_for_command(Command::StartRealtime));
   }
@@ -516,8 +516,8 @@ TEST(NetFTHardwareInterface, DestroyingActiveResourceManagerStopsClient)
 
 TEST(NetFTHardwareInterface, DeactivationQuiescesSensorCommandsAndSampleCallbacks)
 {
-  test::FakeSensor sensor{2000};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{2000};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   configure_and_activate(*manager);
   ASSERT_TRUE(eventually([] {
     return ros2_control_test_access::test_active_activity_counters().sample_generation >= 5;
@@ -538,8 +538,8 @@ TEST(NetFTHardwareInterface, DeactivationQuiescesSensorCommandsAndSampleCallback
 
 TEST(NetFTHardwareInterface, CleanupQuiescesSensorCommandsAndSampleCallbacks)
 {
-  test::FakeSensor sensor{2000};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{2000};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   configure_and_activate(*manager);
   ASSERT_TRUE(eventually([] {
     return ros2_control_test_access::test_active_activity_counters().sample_generation >= 5;
@@ -573,8 +573,8 @@ TEST(NetFTHardwareInterface, SocketFailurePreventsActivationAndLeavesNaNs)
 {
   int closed_port = 0;
   {
-    test::FakeSensor sensor;
-    closed_port = sensor.port();
+    FakeSensor sensor;
+    closed_port = sensor.rdt_port();
   }
   auto manager = make_manager(urdf(
     "127.0.0.1", closed_port,
@@ -593,9 +593,9 @@ TEST(NetFTHardwareInterface, SocketFailurePreventsActivationAndLeavesNaNs)
 
 TEST(NetFTHardwareInterface, ActiveClientTimeoutLatchesAndKeepsEveryAxisInvalid)
 {
-  test::FakeSensor sensor{1000};
+  FakeSensor sensor{1000};
   auto manager = make_manager(urdf(
-    sensor.host(), sensor.port(),
+    sensor.host(), sensor.rdt_port(),
     "<param name=\"receive_timeout\">0.05</param>"));
   configure_and_activate(*manager);
   auto axes = claim_axes(*manager);
@@ -621,8 +621,8 @@ TEST(NetFTHardwareInterface, ActiveClientTimeoutLatchesAndKeepsEveryAxisInvalid)
 
 TEST(NetFTHardwareInterface, CleanupConfigureActivateClearsFaultAndSequenceBaseline)
 {
-  test::FakeSensor sensor{200};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{200};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   configure_and_activate(*manager);
   auto axes = claim_axes(*manager);
   sensor.pause();
@@ -642,9 +642,9 @@ TEST(NetFTHardwareInterface, CleanupConfigureActivateClearsFaultAndSequenceBasel
 
 TEST(NetFTHardwareInterface, BiasServiceIsInstanceLocalAndRequiresActiveStreaming)
 {
-  test::FakeSensor sensor{500};
+  FakeSensor sensor{500};
   auto manager = make_manager(urdf(
-    sensor.host(), sensor.port(),
+    sensor.host(), sensor.rdt_port(),
     "<param name=\"bias_service\">/tool_ft/zero</param>"));
   auto inactive = inactive_state();
   ASSERT_EQ(
@@ -682,8 +682,8 @@ TEST(NetFTHardwareInterface, BiasServiceIsInstanceLocalAndRequiresActiveStreamin
 
 TEST(NetFTHardwareInterface, SanitizesDefaultBiasServiceAndValidatesOverrideDuringInit)
 {
-  test::FakeSensor sensor{500};
-  auto description = urdf_with_sensor_name(sensor.host(), sensor.port(), "tool-ft");
+  FakeSensor sensor{500};
+  auto description = urdf_with_sensor_name(sensor.host(), sensor.rdt_port(), "tool-ft");
   ASSERT_FALSE(description.empty());
   auto manager = make_manager(description);
   auto inactive = inactive_state();
@@ -697,10 +697,10 @@ TEST(NetFTHardwareInterface, SanitizesDefaultBiasServiceAndValidatesOverrideDuri
       "<param name=\"bias_service\">   </param>",
       "<param name=\"bias_service\">/bad//service</param>",
       "<param name=\"bias_service\">/9invalid</param>"}) {
-    EXPECT_TRUE(manager_rejects(urdf(sensor.host(), sensor.port(), invalid))) << invalid;
+    EXPECT_TRUE(manager_rejects(urdf(sensor.host(), sensor.rdt_port(), invalid))) << invalid;
   }
   EXPECT_FALSE(manager_rejects(urdf(
-    sensor.host(), sensor.port(),
+    sensor.host(), sensor.rdt_port(),
     "<param name=\"bias_service\">/custom/zero</param>")));
 }
 
@@ -719,9 +719,9 @@ TEST(NetFTHardwareInterface, DefaultNamesUseAnInjectiveRosTokenEncoding)
   };
 
   for (const auto & item : cases) {
-    test::FakeSensor sensor{500};
+    FakeSensor sensor{500};
     auto manager = make_manager(
-      urdf_with_sensor_name(sensor.host(), sensor.port(), item.sensor_name));
+      urdf_with_sensor_name(sensor.host(), sensor.rdt_port(), item.sensor_name));
     auto inactive = inactive_state();
     ASSERT_EQ(
       manager->set_component_state(kHardwareName, inactive),
@@ -732,10 +732,10 @@ TEST(NetFTHardwareInterface, DefaultNamesUseAnInjectiveRosTokenEncoding)
 
 TEST(NetFTHardwareInterface, CollidingLegacyNamesKeepDefaultBiasServicesIsolated)
 {
-  test::FakeSensor encoded_sensor{500};
-  test::FakeSensor ordinary_sensor{500};
+  FakeSensor encoded_sensor{500};
+  FakeSensor ordinary_sensor{500};
   auto manager = make_manager(two_sensor_urdf(
-    encoded_sensor.port(), ordinary_sensor.port(), "tool-ft", "tool_ft"));
+    encoded_sensor.rdt_port(), ordinary_sensor.rdt_port(), "tool-ft", "tool_ft"));
 
   for (const auto & component : {"left_hardware", "right_hardware"}) {
     auto inactive = inactive_state();
@@ -774,9 +774,9 @@ TEST(NetFTHardwareInterface, CollidingLegacyNamesKeepDefaultBiasServicesIsolated
 
 TEST(NetFTHardwareInterface, BiasWithoutResumedDataFailStopsTheInstance)
 {
-  test::FakeSensor sensor{500};
+  FakeSensor sensor{500};
   auto manager = make_manager(urdf(
-    sensor.host(), sensor.port(),
+    sensor.host(), sensor.rdt_port(),
     "<param name=\"receive_timeout\">0.05</param>"));
   configure_and_activate(*manager);
   sensor.pause();
@@ -790,9 +790,9 @@ TEST(NetFTHardwareInterface, BiasWithoutResumedDataFailStopsTheInstance)
 
 TEST(NetFTHardwareInterface, PublishesInstanceNamedDiagnosticsWithEndpointHardwareId)
 {
-  test::FakeSensor sensor{200};
+  FakeSensor sensor{200};
   auto manager = make_manager(urdf(
-    sensor.host(), sensor.port(),
+    sensor.host(), sensor.rdt_port(),
     "<param name=\"diagnostics_rate\">20</param>"));
   configure_and_activate(*manager);
 
@@ -818,14 +818,14 @@ TEST(NetFTHardwareInterface, PublishesInstanceNamedDiagnosticsWithEndpointHardwa
     std::this_thread::sleep_for(2ms);
   }
   ASSERT_TRUE(seen.load(std::memory_order_acquire));
-  EXPECT_EQ(received.hardware_id, sensor.host() + ":" + std::to_string(sensor.port()));
+  EXPECT_EQ(received.hardware_id, sensor.host() + ":" + std::to_string(sensor.rdt_port()));
 }
 
 TEST(NetFTHardwareInterface, PluginLatchedTimeoutRemainsVisibleInDiagnostics)
 {
-  test::FakeSensor sensor{500};
+  FakeSensor sensor{500};
   auto manager = make_manager(urdf(
-    sensor.host(), sensor.port(),
+    sensor.host(), sensor.rdt_port(),
     "<param name=\"diagnostics_rate\">50</param>"));
   configure_and_activate(*manager);
 
@@ -864,9 +864,9 @@ class PersistentFaultDiagnosticsTest :
 
 TEST_P(PersistentFaultDiagnosticsTest, PublishesErrorForMultipleTimerCycles)
 {
-  test::FakeSensor sensor{500};
+  FakeSensor sensor{500};
   auto manager = make_manager(urdf(
-    sensor.host(), sensor.port(),
+    sensor.host(), sensor.rdt_port(),
     "<param name=\"diagnostics_rate\">50</param>"
     "<param name=\"receive_timeout\">0.05</param>"));
   configure_and_activate(*manager);
@@ -913,8 +913,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST(NetFTHardwareInterface, ExecutorCancelExceptionStillJoinsAuxiliaryThread)
 {
-  test::FakeSensor sensor{500};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  FakeSensor sensor{500};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
   auto inactive = inactive_state();
   ASSERT_EQ(
     manager->set_component_state(kHardwareName, inactive),
@@ -929,9 +929,9 @@ TEST(NetFTHardwareInterface, ExecutorCancelExceptionStillJoinsAuxiliaryThread)
 
 TEST(NetFTHardwareInterface, TwoInstancesHaveIsolatedServicesDiagnosticsAndFaults)
 {
-  test::FakeSensor left{200};
-  test::FakeSensor right{200};
-  auto manager = make_manager(two_sensor_urdf(left.port(), right.port()));
+  FakeSensor left{200};
+  FakeSensor right{200};
+  auto manager = make_manager(two_sensor_urdf(left.rdt_port(), right.rdt_port()));
   for (const auto * component : {"left_hardware", "right_hardware"}) {
     auto inactive = inactive_state();
     ASSERT_EQ(manager->set_component_state(component, inactive), hardware_interface::return_type::OK);
@@ -970,10 +970,10 @@ TEST(NetFTHardwareInterface, TwoInstancesHaveIsolatedServicesDiagnosticsAndFault
     std::lock_guard<std::mutex> lock{diagnostics_mutex};
     EXPECT_EQ(
       diagnostics["netft_driver: left_ft"].hardware_id,
-      left.host() + ":" + std::to_string(left.port()));
+      left.host() + ":" + std::to_string(left.rdt_port()));
     EXPECT_EQ(
       diagnostics["netft_driver: right_ft"].hardware_id,
-      right.host() + ":" + std::to_string(right.port()));
+      right.host() + ":" + std::to_string(right.rdt_port()));
   }
 
   auto left_axis = manager->claim_state_interface("left_ft/force.x");
