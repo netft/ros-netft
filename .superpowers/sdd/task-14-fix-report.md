@@ -199,3 +199,72 @@ deprecation warnings, realtime_tools/Boost CMake policy warnings on newer
 distributions, Jazzy's `ROS_LOCALHOST_ONLY` deprecation, and Humble compiler
 warnings in rclcpp templates. They did not cause a build, test, plugin load,
 symbol audit, or smoke failure. No unresolved fix-wave concern remains.
+
+## Post-review no-Git source-tree fallback
+
+A final release/Bloom review found that the recursive coupling audit depended
+unconditionally on Git metadata. The focused test was added first and run
+with:
+
+```bash
+pixi run -e test python -m pytest -q \
+  test/test_manifest.py::test_dependency_input_discovery_falls_back_outside_git
+```
+
+RED result:
+
+```text
+TypeError: repository_dependency_inputs() takes 0 positional arguments but 1 was given
+1 failed
+```
+
+`repository_dependency_inputs(root=ROOT)` now prefers the existing
+`git ls-files --cached --others --exclude-standard -z` candidate list when
+that command succeeds. A missing Git executable or nonzero result selects a
+recursive filesystem walk instead. Both paths use the same dependency-input
+predicate. The filesystem walk prunes Git/Pixi/worktree/SDD metadata, build,
+install, log, Python/cache, dependency-build, virtual-environment, and
+node-module directories.
+
+Focused GREEN:
+
+```text
+pixi run -e test python -m pytest -q test/test_manifest.py
+3 passed
+```
+
+The working source was then copied to a temporary tree without Git metadata or
+generated directories, and the manifest suite was run from that extracted
+root:
+
+```bash
+source_tree=$(mktemp -d) &&
+tar -cf - \
+  --exclude='./.git' --exclude='./.pixi' --exclude='./.worktrees' \
+  --exclude='./.superpowers' --exclude='./build' --exclude='./install' \
+  --exclude='./log' --exclude='*/__pycache__' \
+  --exclude='*/.pytest_cache' . |
+tar -xf - -C "$source_tree" &&
+test ! -e "$source_tree/.git" &&
+pixi run -e test python -m pytest -q "$source_tree/test/test_manifest.py"
+```
+
+Result:
+
+```text
+3 passed
+no_git_manifest_pytest=pass
+```
+
+Final regression commands:
+
+```text
+pixi run unit
+143 passed, 1 skipped
+
+pixi run -e test core-test
+13/13 CTests passed
+
+git diff --check
+PASS
+```

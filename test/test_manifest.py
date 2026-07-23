@@ -1,3 +1,4 @@
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -23,43 +24,125 @@ DEPENDENCY_INPUT_SUFFIXES = {
     ".cmake",
     ".repos",
 }
+EXCLUDED_INPUT_DIRECTORY_NAMES = {
+    ".cache",
+    ".git",
+    ".mypy_cache",
+    ".nox",
+    ".pixi",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".superpowers",
+    ".tox",
+    ".venv",
+    ".worktrees",
+    "CMakeFiles",
+    "__pycache__",
+    "_deps",
+    "build",
+    "install",
+    "log",
+    "node_modules",
+    "venv",
+}
 
 
-def repository_dependency_inputs():
-    paths = subprocess.run(
-        [
-            "git",
-            "ls-files",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-            "-z",
-        ],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-    ).stdout.decode("utf-8").split("\0")
+def is_dependency_input(path):
+    is_workflow = (
+        len(path.parts) == 3
+        and path.parts[:2] == (".github", "workflows")
+        and path.suffix in {".yml", ".yaml"}
+    )
+    is_manifest = (
+        path.name in DEPENDENCY_INPUT_NAMES
+        or path.name.startswith("requirements")
+        and path.suffix == ".txt"
+    )
+    return (
+        path.name == "CMakeLists.txt"
+        or path.suffix in DEPENDENCY_INPUT_SUFFIXES
+        or is_workflow
+        or is_manifest
+    )
+
+
+def filesystem_repository_paths(root):
+    for directory, directory_names, file_names in os.walk(root):
+        directory_names[:] = sorted(
+            name
+            for name in directory_names
+            if name not in EXCLUDED_INPUT_DIRECTORY_NAMES
+        )
+        directory_path = Path(directory)
+        for name in sorted(file_names):
+            yield (directory_path / name).relative_to(root)
+
+
+def repository_dependency_inputs(root=ROOT):
+    root = Path(root)
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+        )
+    except OSError:
+        result = None
+
+    if result is not None and result.returncode == 0:
+        paths = (
+            Path(os.fsdecode(relative))
+            for relative in result.stdout.split(b"\0")
+            if relative
+        )
+    else:
+        paths = filesystem_repository_paths(root)
+
     for relative in paths:
-        if not relative:
-            continue
         path = Path(relative)
-        is_workflow = (
-            len(path.parts) == 3
-            and path.parts[:2] == (".github", "workflows")
-            and path.suffix in {".yml", ".yaml"}
-        )
-        is_manifest = (
-            path.name in DEPENDENCY_INPUT_NAMES
-            or path.name.startswith("requirements")
-            and path.suffix == ".txt"
-        )
-        if (
-            path.name == "CMakeLists.txt"
-            or path.suffix in DEPENDENCY_INPUT_SUFFIXES
-            or is_workflow
-            or is_manifest
-        ):
+        if is_dependency_input(path):
             yield path
+
+
+def test_dependency_input_discovery_falls_back_outside_git(tmp_path):
+    expected = {
+        Path("CMakeLists.txt"),
+        Path("nested/CMakeLists.txt"),
+        Path("nested/toolchain.cmake"),
+        Path("nested/dependencies.repos"),
+        Path(".github/workflows/ci.yml"),
+        Path("package.xml"),
+        Path("nested/requirements-dev.txt"),
+        Path("nested/pixi.toml"),
+    }
+    excluded = {
+        Path(directory) / "CMakeLists.txt"
+        for directory in (
+            ".git",
+            ".pixi",
+            ".worktrees",
+            ".superpowers",
+            "build",
+            "install",
+            "log",
+            "__pycache__",
+            ".pytest_cache",
+        )
+    }
+    for relative in expected | excluded | {Path("nested/README.md")}:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("dependency input\n", encoding="utf-8")
+
+    assert set(repository_dependency_inputs(tmp_path)) == expected
 
 
 def test_manifest_has_conditional_ros_build_types_and_dependencies():
