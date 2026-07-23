@@ -1,5 +1,7 @@
 sensor_ip: 192.168.1.1
 sensor_port: 49152
+http_port: 80
+use_sensor_calibration: true
 frame_id: netft_link
 wrench_topic: /netft/wrench
 bias_service: /netft/bias
@@ -7,6 +9,8 @@ counts_per_force: 1000000.0
 counts_per_torque: 1000000.0
 publish_rate: 0.0
 receive_timeout: 0.1
+configuration_connect_timeout: 0.5
+configuration_timeout: 1.0
 reconnect_initial_delay: 0.25
 reconnect_max_delay: 5.0
 diagnostics_rate: 1.0
