@@ -96,12 +96,23 @@ std::size_t PosixTransport::receive(std::uint8_t *data, const std::size_t capaci
   }
 
   pollfd descriptor{socket, POLLIN, 0};
+  const auto deadline = std::chrono::steady_clock::now() + timeout;
+  auto remaining = timeout;
   int poll_result{};
-  do {
-    poll_result = ::poll(&descriptor, 1, timeout_milliseconds(timeout));
-  } while (poll_result < 0 && errno == EINTR);
-  if (poll_result < 0) {
-    throw socket_error("failed to wait for UDP record");
+  while (true) {
+    poll_result = ::poll(&descriptor, 1, timeout_milliseconds(remaining));
+    if (poll_result >= 0) {
+      break;
+    }
+    if (errno != EINTR) {
+      throw socket_error("failed to wait for UDP record");
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    if (now >= deadline) {
+      return 0;
+    }
+    remaining = deadline - now;
   }
   if (poll_result == 0) {
     return 0;

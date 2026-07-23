@@ -32,6 +32,21 @@ add_netft_snapshot_test(netft_snapshot_fault_latch
   test_fault_latch.cpp
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/fault_latch.cpp)
 
+add_executable(netft_snapshot_posix_transport
+  test_posix_transport.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/posix_transport.cpp)
+target_compile_features(netft_snapshot_posix_transport PRIVATE cxx_std_17)
+target_include_directories(netft_snapshot_posix_transport PRIVATE
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src)
+target_link_options(netft_snapshot_posix_transport PRIVATE
+  "-Wl,--wrap=poll"
+  "-Wl,--wrap=recv"
+  "-Wl,--wrap=send")
+target_link_libraries(netft_snapshot_posix_transport PRIVATE
+  ${NETFT_GTEST_MAIN_TARGET})
+add_test(NAME netft_snapshot_posix_transport
+  COMMAND netft_snapshot_posix_transport)
+
 add_netft_snapshot_test(netft_snapshot_discovery
   test_discovery.cpp
   support/fake_http_server.cpp
