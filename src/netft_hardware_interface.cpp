@@ -38,6 +38,24 @@ namespace netft_driver {
 
 class NetFTHardwareInterface;
 
+#ifdef NETFT_ROS2_CONTROL_TESTING
+namespace ros2_control_test_access::detail {
+
+void force_initial_sample_once() noexcept;
+void fail_state_write_once_at(std::size_t axis) noexcept;
+void latch_active_fault(FaultCode fault) noexcept;
+bool read_active_instance() noexcept;
+FaultCode active_fault_code() noexcept;
+FaultCode active_client_fault_code() noexcept;
+FaultCode active_latched_fault_code() noexcept;
+ActivityCounters active_activity_counters() noexcept;
+bool interface_write_fault_latched() noexcept;
+void throw_executor_cancel_once() noexcept;
+int auxiliary_thread_count() noexcept;
+
+}  // namespace ros2_control_test_access::detail
+#endif
+
 namespace {
 
 constexpr std::array<const char *, 6> kInterfaceNames{
@@ -326,9 +344,15 @@ public:
 private:
 #ifdef NETFT_ROS2_CONTROL_TESTING
   friend ros2_control_test_access::FaultCode
-    ros2_control_test_access::test_active_fault_code() noexcept;
-  friend bool ros2_control_test_access::test_interface_write_fault_latched() noexcept;
-  friend void ros2_control_test_access::test_latch_active_fault(
+    ros2_control_test_access::detail::active_fault_code() noexcept;
+  friend ros2_control_test_access::FaultCode
+    ros2_control_test_access::detail::active_client_fault_code() noexcept;
+  friend ros2_control_test_access::FaultCode
+    ros2_control_test_access::detail::active_latched_fault_code() noexcept;
+  friend ros2_control_test_access::ActivityCounters
+    ros2_control_test_access::detail::active_activity_counters() noexcept;
+  friend bool ros2_control_test_access::detail::interface_write_fault_latched() noexcept;
+  friend void ros2_control_test_access::detail::latch_active_fault(
     ros2_control_test_access::FaultCode) noexcept;
 #endif
 
@@ -644,7 +668,7 @@ static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
 static_assert(std::atomic<netft::FaultCode>::is_always_lock_free);
 
 #ifdef NETFT_ROS2_CONTROL_TESTING
-namespace ros2_control_test_access {
+namespace ros2_control_test_access::detail {
 namespace {
 
 FaultCode to_test_fault(const netft::FaultCode fault) noexcept
@@ -681,23 +705,23 @@ netft::FaultCode to_client_fault(const FaultCode fault) noexcept
 
 }  // namespace
 
-void test_force_initial_sample_once() noexcept
+void force_initial_sample_once() noexcept
 {
   g_test_return_initial_sample.store(true, std::memory_order_release);
 }
 
-void test_fail_state_write_once_at(const std::size_t axis) noexcept
+void fail_state_write_once_at(const std::size_t axis) noexcept
 {
   g_test_failed_write_axis.store(static_cast<int>(axis), std::memory_order_release);
 }
 
-void test_latch_active_fault(const FaultCode fault) noexcept
+void latch_active_fault(const FaultCode fault) noexcept
 {
   auto * instance = g_test_instance.load(std::memory_order_acquire);
   if (instance != nullptr) instance->latch_fatal_fault(to_client_fault(fault));
 }
 
-bool test_read_active_instance() noexcept
+bool read_active_instance() noexcept
 {
   auto * instance = g_test_instance.load(std::memory_order_acquire);
   if (instance == nullptr) return false;
@@ -706,7 +730,7 @@ bool test_read_active_instance() noexcept
          hardware_interface::return_type::OK;
 }
 
-FaultCode test_active_fault_code() noexcept
+FaultCode active_fault_code() noexcept
 {
   const auto * instance = g_test_instance.load(std::memory_order_acquire);
   if (instance == nullptr) return FaultCode::None;
@@ -717,27 +741,113 @@ FaultCode test_active_fault_code() noexcept
   return to_test_fault(instance->client_->fault_code());
 }
 
-bool test_interface_write_fault_latched() noexcept
+FaultCode active_client_fault_code() noexcept
+{
+  const auto * instance = g_test_instance.load(std::memory_order_acquire);
+  if (instance == nullptr || !instance->client_) return FaultCode::None;
+  return to_test_fault(instance->client_->fault_code());
+}
+
+FaultCode active_latched_fault_code() noexcept
+{
+  const auto * instance = g_test_instance.load(std::memory_order_acquire);
+  if (instance == nullptr) return FaultCode::None;
+  return to_test_fault(instance->fatal_fault_.load(std::memory_order_acquire));
+}
+
+ActivityCounters active_activity_counters() noexcept
+{
+  const auto * instance = g_test_instance.load(std::memory_order_acquire);
+  if (instance == nullptr) return {};
+  return {
+    instance->sample_generation_.load(std::memory_order_acquire),
+  };
+}
+
+bool interface_write_fault_latched() noexcept
 {
   const auto * instance = g_test_instance.load(std::memory_order_acquire);
   return instance != nullptr &&
          instance->interface_write_fault_.load(std::memory_order_acquire);
 }
 
-void test_throw_executor_cancel_once() noexcept
+void throw_executor_cancel_once() noexcept
 {
   g_test_throw_executor_cancel.store(true, std::memory_order_release);
 }
 
-int test_auxiliary_thread_count() noexcept
+int auxiliary_thread_count() noexcept
 {
   return g_test_auxiliary_threads.load(std::memory_order_acquire);
 }
 
-}  // namespace ros2_control_test_access
+}  // namespace ros2_control_test_access::detail
 #endif
 
 }  // namespace netft_driver
+
+#ifdef NETFT_ROS2_CONTROL_TESTING
+extern "C" void netft_ros2_control_test_force_initial_sample_once() noexcept
+{
+  netft_driver::ros2_control_test_access::detail::force_initial_sample_once();
+}
+
+extern "C" void netft_ros2_control_test_fail_state_write_once_at(
+  const std::size_t axis) noexcept
+{
+  netft_driver::ros2_control_test_access::detail::fail_state_write_once_at(axis);
+}
+
+extern "C" void netft_ros2_control_test_latch_active_fault(
+  const netft_driver::ros2_control_test_access::FaultCode fault) noexcept
+{
+  netft_driver::ros2_control_test_access::detail::latch_active_fault(fault);
+}
+
+extern "C" bool netft_ros2_control_test_read_active_instance() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::read_active_instance();
+}
+
+extern "C" netft_driver::ros2_control_test_access::FaultCode
+netft_ros2_control_test_active_fault_code() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::active_fault_code();
+}
+
+extern "C" netft_driver::ros2_control_test_access::FaultCode
+netft_ros2_control_test_active_client_fault_code() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::active_client_fault_code();
+}
+
+extern "C" netft_driver::ros2_control_test_access::FaultCode
+netft_ros2_control_test_active_latched_fault_code() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::active_latched_fault_code();
+}
+
+extern "C" netft_driver::ros2_control_test_access::ActivityCounters
+netft_ros2_control_test_active_activity_counters() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::active_activity_counters();
+}
+
+extern "C" bool netft_ros2_control_test_interface_write_fault_latched() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::interface_write_fault_latched();
+}
+
+extern "C" void netft_ros2_control_test_throw_executor_cancel_once() noexcept
+{
+  netft_driver::ros2_control_test_access::detail::throw_executor_cancel_once();
+}
+
+extern "C" int netft_ros2_control_test_auxiliary_thread_count() noexcept
+{
+  return netft_driver::ros2_control_test_access::detail::auxiliary_thread_count();
+}
+#endif
 
 PLUGINLIB_EXPORT_CLASS(
   netft_driver::NetFTHardwareInterface, hardware_interface::SensorInterface)

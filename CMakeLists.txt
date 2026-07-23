@@ -143,21 +143,26 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
   else()
     set(NETFT_ROS2_CONTROL_API_DEFINITION NETFT_ROS2_CONTROL_MODERN_API)
   endif()
+
+  function(netft_configure_ros2_control_target target)
+    target_compile_definitions(${target} PRIVATE
+      ${NETFT_ROS2_CONTROL_API_DEFINITION})
+    target_include_directories(${target} PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(${target} PRIVATE
+      netft_ros_support
+      netft_sdk_core
+      ${hardware_interface_TARGETS}
+      ${pluginlib_TARGETS}
+      ${rclcpp_TARGETS}
+      ${realtime_tools_TARGETS}
+      ${std_srvs_TARGETS}
+      ${diagnostic_msgs_TARGETS}
+    )
+  endfunction()
+
   add_library(netft_ros2_control SHARED src/netft_hardware_interface.cpp)
-  target_compile_definitions(netft_ros2_control PRIVATE
-    ${NETFT_ROS2_CONTROL_API_DEFINITION})
-  target_include_directories(netft_ros2_control PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src)
-  target_link_libraries(netft_ros2_control PRIVATE
-    netft_ros_support
-    netft_sdk_core
-    ${hardware_interface_TARGETS}
-    ${pluginlib_TARGETS}
-    ${rclcpp_TARGETS}
-    ${realtime_tools_TARGETS}
-    ${std_srvs_TARGETS}
-    ${diagnostic_msgs_TARGETS}
-  )
+  netft_configure_ros2_control_target(netft_ros2_control)
   pluginlib_export_plugin_description_file(
     hardware_interface netft_hardware_plugins.xml)
   add_executable(netft_node_cpp src/ros2_node.cpp)
@@ -209,10 +214,45 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
     )
   endif()
   if(BUILD_TESTING)
-    target_compile_definitions(netft_ros2_control PRIVATE
-      NETFT_ROS2_CONTROL_TESTING)
     find_package(ament_cmake_pytest REQUIRED)
     find_package(ament_cmake_gtest REQUIRED)
+
+    set(
+      NETFT_ROS2_CONTROL_TEST_PREFIX
+      "${CMAKE_CURRENT_BINARY_DIR}/netft_ros2_control_test_prefix")
+    set(
+      NETFT_ROS2_CONTROL_TEST_SHARE
+      "${NETFT_ROS2_CONTROL_TEST_PREFIX}/share/${PROJECT_NAME}")
+    file(MAKE_DIRECTORY
+      "${NETFT_ROS2_CONTROL_TEST_PREFIX}/lib"
+      "${NETFT_ROS2_CONTROL_TEST_PREFIX}/share/ament_index/resource_index/packages"
+      "${NETFT_ROS2_CONTROL_TEST_PREFIX}/share/ament_index/resource_index/hardware_interface__pluginlib__plugin"
+      "${NETFT_ROS2_CONTROL_TEST_SHARE}")
+    configure_file(
+      test/cpp/netft_hardware_test_plugins.xml
+      "${NETFT_ROS2_CONTROL_TEST_SHARE}/netft_hardware_test_plugins.xml"
+      COPYONLY)
+    configure_file(
+      package.xml
+      "${NETFT_ROS2_CONTROL_TEST_SHARE}/package.xml"
+      COPYONLY)
+    file(WRITE
+      "${NETFT_ROS2_CONTROL_TEST_PREFIX}/share/ament_index/resource_index/packages/${PROJECT_NAME}"
+      "")
+    file(WRITE
+      "${NETFT_ROS2_CONTROL_TEST_PREFIX}/share/ament_index/resource_index/hardware_interface__pluginlib__plugin/${PROJECT_NAME}"
+      "share/${PROJECT_NAME}/netft_hardware_test_plugins.xml")
+
+    add_library(
+      netft_ros2_control_testing SHARED
+      src/netft_hardware_interface.cpp)
+    netft_configure_ros2_control_target(netft_ros2_control_testing)
+    target_compile_definitions(netft_ros2_control_testing PRIVATE
+      NETFT_ROS2_CONTROL_TESTING)
+    set_target_properties(netft_ros2_control_testing PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY "${NETFT_ROS2_CONTROL_TEST_PREFIX}/lib"
+      RUNTIME_OUTPUT_DIRECTORY "${NETFT_ROS2_CONTROL_TEST_PREFIX}/lib")
+
     ament_add_gtest(netft_ros2_node test/cpp/test_ros2_node.cpp)
     if(TARGET netft_ros2_node)
       target_link_libraries(netft_ros2_node
@@ -227,27 +267,32 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
     ament_add_gtest(netft_hardware_interface
       test/cpp/test_hardware_interface.cpp
       test/cpp/support/fake_sensor.cpp
+      test/cpp/support/ros2_control_test_access.cpp
       test/core/support/fake_http_server.cpp
       test/core/support/fake_sensor.cpp
+      ENV
+        "AMENT_PREFIX_PATH=${NETFT_ROS2_CONTROL_TEST_PREFIX}:$ENV{AMENT_PREFIX_PATH}"
     )
     if(TARGET netft_hardware_interface)
       target_compile_definitions(netft_hardware_interface PRIVATE
-        ${NETFT_ROS2_CONTROL_API_DEFINITION}
-        NETFT_ROS2_CONTROL_TESTING)
+        ${NETFT_ROS2_CONTROL_API_DEFINITION})
       target_include_directories(netft_hardware_interface PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/test/core
         ${NETFT_SNAPSHOT_SOURCE_DIR}/src)
       target_link_libraries(netft_hardware_interface
-        netft_ros2_control
         netft_ros_support
         netft_sdk_core
+        ${CMAKE_DL_LIBS}
         ${hardware_interface_TARGETS}
         ${rclcpp_TARGETS}
         ${std_srvs_TARGETS}
         ${diagnostic_msgs_TARGETS}
       )
+      add_dependencies(
+        netft_hardware_interface
+        netft_ros2_control_testing)
     endif()
     ament_add_pytest_test(netft_unit test
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

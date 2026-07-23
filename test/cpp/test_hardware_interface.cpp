@@ -33,6 +33,7 @@ namespace {
 
 constexpr const char * kHardwareName = "netft_hardware";
 constexpr const char * kSensorName = "netft_sensor";
+constexpr const char * kTestPlugin = "netft_driver/NetFTHardwareInterfaceTesting";
 using FaultCode = ros2_control_test_access::FaultCode;
 
 std::string urdf(
@@ -53,7 +54,7 @@ std::string urdf(
   return "<?xml version=\"1.0\"?><robot name=\"test\">"
     "<link name=\"base\"/><ros2_control name=\"" + std::string{kHardwareName} +
     "\" type=\"sensor\"><hardware>"
-    "<plugin>netft_driver/NetFTHardwareInterface</plugin>"
+    "<plugin>" + std::string{kTestPlugin} + "</plugin>"
     "<param name=\"sensor_ip\">" + host + "</param>"
     "<param name=\"sensor_port\">" + std::to_string(port) + "</param>"
     "<param name=\"use_sensor_calibration\">" +
@@ -114,7 +115,7 @@ std::string two_sensor_urdf(
       interfaces += "<state_interface name=\"" + std::string{name} + "\"/>";
     }
     return "<ros2_control name=\"" + hardware_name + "\" type=\"sensor\">"
-      "<hardware><plugin>netft_driver/NetFTHardwareInterface</plugin>"
+      "<hardware><plugin>" + std::string{kTestPlugin} + "</plugin>"
       "<param name=\"sensor_ip\">127.0.0.1</param>"
       "<param name=\"sensor_port\">" + std::to_string(port) + "</param>"
       "<param name=\"use_sensor_calibration\">false</param>"
@@ -209,6 +210,27 @@ bool eventually(const std::function<bool()> & predicate, std::chrono::millisecon
     std::this_thread::sleep_for(2ms);
   }
   return predicate();
+}
+
+struct NetworkActivityCounters {
+  std::size_t sensor_commands;
+  std::uint64_t sample_callbacks;
+};
+
+NetworkActivityCounters network_activity(const test::FakeSensor & sensor)
+{
+  return {
+    sensor.commands().size(),
+    ros2_control_test_access::test_active_activity_counters().sample_generation,
+  };
+}
+
+void expect_no_new_network_activity(
+  const test::FakeSensor & sensor, const NetworkActivityCounters expected)
+{
+  const auto observed = network_activity(sensor);
+  EXPECT_EQ(observed.sensor_commands, expected.sensor_commands);
+  EXPECT_EQ(observed.sample_callbacks, expected.sample_callbacks);
 }
 
 void configure_and_activate(hardware_interface::ResourceManager & manager)
@@ -492,6 +514,55 @@ TEST(NetFTHardwareInterface, DestroyingActiveResourceManagerStopsClient)
   EXPECT_TRUE(sensor.wait_for_command(Command::StopStreaming));
 }
 
+TEST(NetFTHardwareInterface, DeactivationQuiescesSensorCommandsAndSampleCallbacks)
+{
+  test::FakeSensor sensor{2000};
+  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  configure_and_activate(*manager);
+  ASSERT_TRUE(eventually([] {
+    return ros2_control_test_access::test_active_activity_counters().sample_generation >= 5;
+  }));
+
+  auto inactive = inactive_state();
+  ASSERT_EQ(
+    manager->set_component_state(kHardwareName, inactive),
+    hardware_interface::return_type::OK);
+  ASSERT_TRUE(sensor.wait_for_command(Command::StopStreaming));
+  const auto stopped = network_activity(sensor);
+  ASSERT_EQ(stopped.sample_callbacks, 0U);
+
+  sensor.send_payload_now(std::vector<std::uint8_t>(36));
+  std::this_thread::sleep_for(50ms);
+  expect_no_new_network_activity(sensor, stopped);
+}
+
+TEST(NetFTHardwareInterface, CleanupQuiescesSensorCommandsAndSampleCallbacks)
+{
+  test::FakeSensor sensor{2000};
+  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  configure_and_activate(*manager);
+  ASSERT_TRUE(eventually([] {
+    return ros2_control_test_access::test_active_activity_counters().sample_generation >= 5;
+  }));
+
+  auto inactive = inactive_state();
+  ASSERT_EQ(
+    manager->set_component_state(kHardwareName, inactive),
+    hardware_interface::return_type::OK);
+  auto unconfigured = unconfigured_state();
+  ASSERT_EQ(
+    manager->set_component_state(kHardwareName, unconfigured),
+    hardware_interface::return_type::OK);
+  const auto cleaned = network_activity(sensor);
+  ASSERT_EQ(cleaned.sample_callbacks, 0U);
+  ASSERT_EQ(ros2_control_test_access::test_auxiliary_thread_count(), 0);
+
+  sensor.send_payload_now(std::vector<std::uint8_t>(36));
+  std::this_thread::sleep_for(50ms);
+  expect_no_new_network_activity(sensor, cleaned);
+  EXPECT_EQ(ros2_control_test_access::test_auxiliary_thread_count(), 0);
+}
+
 INSTANTIATE_TEST_SUITE_P(
   EveryFatalClass, FatalFaultTest,
   testing::Values(
@@ -520,24 +591,31 @@ TEST(NetFTHardwareInterface, SocketFailurePreventsActivationAndLeavesNaNs)
   for (const auto & axis : axes) EXPECT_TRUE(std::isnan(axis_value(axis)));
 }
 
-TEST(NetFTHardwareInterface, ActiveSocketFailureLatchesAndKeepsEveryAxisInvalid)
+TEST(NetFTHardwareInterface, ActiveClientTimeoutLatchesAndKeepsEveryAxisInvalid)
 {
   test::FakeSensor sensor{1000};
-  auto manager = make_manager(urdf(sensor.host(), sensor.port()));
+  auto manager = make_manager(urdf(
+    sensor.host(), sensor.port(),
+    "<param name=\"receive_timeout\">0.05</param>"));
   configure_and_activate(*manager);
   auto axes = claim_axes(*manager);
 
-  ros2_control_test_access::test_latch_active_fault(FaultCode::Socket);
+  sensor.pause();
   ASSERT_TRUE(eventually([&] {
-    return ros2_control_test_access::test_active_fault_code() == FaultCode::Socket;
-  }));
+    return ros2_control_test_access::test_active_client_fault_code() == FaultCode::Timeout;
+  }, 500ms));
+  EXPECT_EQ(ros2_control_test_access::test_active_latched_fault_code(), FaultCode::None);
   EXPECT_FALSE(read_ok(*manager));
-  EXPECT_EQ(ros2_control_test_access::test_active_fault_code(), FaultCode::Socket);
+  EXPECT_EQ(ros2_control_test_access::test_active_latched_fault_code(), FaultCode::Timeout);
+  EXPECT_EQ(ros2_control_test_access::test_active_fault_code(), FaultCode::Timeout);
   for (const auto & axis : axes) EXPECT_TRUE(std::isnan(axis_value(axis)));
 
+  sensor.resume();
   sensor.send_payload_now(std::vector<std::uint8_t>(36));
+  std::this_thread::sleep_for(20ms);
   EXPECT_FALSE(ros2_control_test_access::test_read_active_instance());
-  EXPECT_EQ(ros2_control_test_access::test_active_fault_code(), FaultCode::Socket);
+  EXPECT_EQ(ros2_control_test_access::test_active_latched_fault_code(), FaultCode::Timeout);
+  EXPECT_EQ(ros2_control_test_access::test_active_fault_code(), FaultCode::Timeout);
   for (const auto & axis : axes) EXPECT_TRUE(std::isnan(axis_value(axis)));
 }
 
