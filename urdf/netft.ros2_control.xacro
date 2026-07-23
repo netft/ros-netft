@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="netft_ros2_control" params="name sensor_name sensor_ip sensor_port:=49152 http_port:=80 use_sensor_calibration:=true counts_per_force:=1000000 counts_per_torque:=1000000 receive_timeout:=0.1 configuration_connect_timeout:=0.5 configuration_timeout:=1.0 activation_timeout:=2.0 bias_service:=''">
+  <xacro:macro name="netft_ros2_control" params="name sensor_name sensor_ip:=192.168.1.1 sensor_port:=49152 http_port:=80 use_sensor_calibration:=true counts_per_force:=1000000 counts_per_torque:=1000000 receive_timeout:=0.1 configuration_connect_timeout:=0.5 configuration_timeout:=1.0 activation_timeout:=2.0 bias_service:=''">
     <ros2_control name="${name}" type="sensor">
       <hardware>
         <plugin>netft_driver/NetFTHardwareInterface</plugin>

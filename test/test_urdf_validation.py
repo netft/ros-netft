@@ -5,6 +5,7 @@ from xml.etree import ElementTree
 ROOT = Path(__file__).resolve().parents[1]
 XACRO_NAMESPACE = "http://www.ros.org/wiki/xacro"
 EXPECTED_DEFAULTS = {
+    "sensor_ip": "192.168.1.1",
     "sensor_port": "49152",
     "http_port": "80",
     "use_sensor_calibration": "true",
@@ -25,7 +26,6 @@ def xacro_parameters():
 
 def test_ros2_control_xacro_exposes_automatic_sensor_calibration_defaults():
     parameters = xacro_parameters()
-    assert parameters["sensor_ip"] == ""
     assert {name: parameters[name] for name in EXPECTED_DEFAULTS} == EXPECTED_DEFAULTS
     assert parameters["counts_per_force"] == "1000000"
     assert parameters["counts_per_torque"] == "1000000"
