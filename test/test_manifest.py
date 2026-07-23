@@ -1,9 +1,65 @@
 import re
+import subprocess
 from pathlib import Path
 from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DEPENDENCY_INPUT_NAMES = {
+    "Cargo.toml",
+    "Pipfile",
+    "conanfile.py",
+    "conanfile.txt",
+    "package.json",
+    "package.xml",
+    "pixi.lock",
+    "pixi.toml",
+    "pyproject.toml",
+    "setup.cfg",
+    "setup.py",
+    "vcpkg.json",
+}
+DEPENDENCY_INPUT_SUFFIXES = {
+    ".cmake",
+    ".repos",
+}
+
+
+def repository_dependency_inputs():
+    paths = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout.decode("utf-8").split("\0")
+    for relative in paths:
+        if not relative:
+            continue
+        path = Path(relative)
+        is_workflow = (
+            len(path.parts) == 3
+            and path.parts[:2] == (".github", "workflows")
+            and path.suffix in {".yml", ".yaml"}
+        )
+        is_manifest = (
+            path.name in DEPENDENCY_INPUT_NAMES
+            or path.name.startswith("requirements")
+            and path.suffix == ".txt"
+        )
+        if (
+            path.name == "CMakeLists.txt"
+            or path.suffix in DEPENDENCY_INPUT_SUFFIXES
+            or is_workflow
+            or is_manifest
+        ):
+            yield path
 
 
 def test_manifest_has_conditional_ros_build_types_and_dependencies():
@@ -51,17 +107,22 @@ def test_repository_keeps_one_private_vendored_core():
         r"install\s*\(\s*DIRECTORY\s+(?:include/netft|src/core)", cmake
     )
 
-    dependency_inputs = "\n".join(
-        (ROOT / path).read_text(encoding="utf-8")
-        for path in ("CMakeLists.txt", "package.xml", "pixi.toml")
-    )
-    assert not re.search(
+    forbidden_coupling = re.compile(
         r"find_" r"package\s*\(\s*netft\b|"
         r"Fetch" r"Content|External" r"Project|"
-        r"netft-" r"cpp.*(?:conda|robostack)",
-        dependency_inputs,
+        r"netft[-_]" r"cpp|netft_" r"sdk_core",
         re.IGNORECASE,
     )
+    violations = {
+        str(path): match.group(0)
+        for path in repository_dependency_inputs()
+        if (
+            match := forbidden_coupling.search(
+                (ROOT / path).read_text(encoding="utf-8")
+            )
+        )
+    }
+    assert violations == {}
 
     manifest = ElementTree.parse(str(ROOT / "package.xml")).getroot()
     assert all(

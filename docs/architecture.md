@@ -24,7 +24,14 @@ src/netft_hardware_interface.cpp
 
 `netft_ros_support` is the boundary between the private snapshot and the adapters. It owns SI conversion and ROS-facing diagnostic interpretation but no transport. The build selects either the ROS 1 or ROS 2 standalone adapter and installs it as `netft_node`. `netft_check` performs a bounded acquisition without ROS graph traffic or a software-bias command.
 
-The source tree still builds and installs `netft_core` for the legacy public `netft_driver` headers, but no current executable or ROS adapter links it for sensor transport. The ROS 2 build exports the uninstrumented `netft_ros2_control` target as `netft_driver/NetFTHardwareInterface` through `netft_hardware_plugins.xml`. When tests are enabled, a separate non-installed `netft_ros2_control_testing` plugin is compiled with private hooks and loaded through a build-tree-only plugin index; the production plugin is never compiled with those hooks.
+`netft_core`, `netft_ros_support`, and their headers remain private and are not
+installed. The ROS 2 build installs the uninstrumented
+`netft_ros2_control` plugin as `netft_driver/NetFTHardwareInterface` through
+`netft_hardware_plugins.xml`; core and support archive symbols are localized
+at that DSO boundary. When tests are enabled, a separate non-installed
+`netft_ros2_control_testing` plugin is compiled with private hooks and loaded
+through a build-tree-only plugin index; the production plugin is never
+compiled with those hooks.
 
 The plugin is one consumer of a robot's existing controller manager; it does not implement a controller or require a second controller manager.
 

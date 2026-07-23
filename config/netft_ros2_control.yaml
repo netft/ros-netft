@@ -10,14 +10,3 @@ netft_broadcaster:
     # use netft_encoded_ plus their lowercase hexadecimal UTF-8 bytes.
     sensor_name: netft_sensor
     frame_id: netft_sensor
-
-netft_hardware:
-  ros__parameters:
-    sensor_ip: 192.168.1.1
-    sensor_port: 49152
-    http_port: 80
-    use_sensor_calibration: true
-    counts_per_force: 1000000.0
-    counts_per_torque: 1000000.0
-    configuration_connect_timeout: 0.5
-    configuration_timeout: 1.0

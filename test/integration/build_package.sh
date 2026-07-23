@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 temp_root="$(mktemp -d)"
+symbol_audit="$repo_root/test/integration/audit_ros2_control_symbols.sh"
 roscore_pid=""
 cleanup() {
   if [[ -n "$roscore_pid" ]]; then
@@ -63,6 +64,13 @@ assert_native_install() {
     test ! -e "$share_root/config/netft_ros1.yaml"
     test -x "$install_root/lib/netft_driver/netft_node"
     test -x "$install_root/lib/netft_driver/netft_check"
+    test -f "$install_root/lib/libnetft_ros2_control.so"
+    "$symbol_audit" "$install_root/lib/libnetft_ros2_control.so"
+    if find "$install_root" -name 'libnetft_ros2_control_testing.so*' \
+        -print -quit | grep -q .; then
+      echo "test-only ros2_control plugin found in install tree" >&2
+      return 1
+    fi
     ! find "$install_root" -type d -path '*/site-packages/netft_driver' -print -quit | grep -q .
   fi
 }
@@ -105,6 +113,8 @@ elif [[ "${ROS_VERSION:-}" == "2" ]]; then
     --packages-select netft_driver \
     --event-handlers console_direct+ \
     --cmake-args -DCMAKE_BUILD_TYPE=Release
+  "$symbol_audit" \
+    "$temp_root/ws/build/netft_driver/libnetft_ros2_control.so"
   assert_native_install \
     "$temp_root/ws/install/netft_driver" 2 \
     "$temp_root/ws/build/netft_driver/install_manifest.txt"

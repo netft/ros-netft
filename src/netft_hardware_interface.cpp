@@ -478,7 +478,7 @@ private:
       [this](const std::shared_ptr<std_srvs::srv::Trigger::Request>,
         std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
         try {
-          if (!client_) throw netft::NotConnectedError{"client is not configured"};
+          if (!client_) throw std::runtime_error{"client is not configured"};
           client_->bias();
           response->success = true;
           response->message = "software bias command sent and RDT streaming restarted";

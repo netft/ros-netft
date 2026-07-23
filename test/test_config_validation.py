@@ -67,6 +67,13 @@ def test_ros2_yaml_exposes_automatic_sensor_calibration_defaults():
     assert_connection_defaults(config["netft"]["ros__parameters"])
 
 
-def test_ros2_control_yaml_exposes_automatic_sensor_calibration_defaults():
+def test_ros2_control_yaml_contains_only_controller_configuration():
     config = parse_yaml_mapping(ROOT / "config/netft_ros2_control.yaml")
-    assert_connection_defaults(config.get("netft_hardware", {}).get("ros__parameters", {}))
+    assert set(config) == {"controller_manager", "netft_broadcaster"}
+    assert "netft_hardware" not in config
+    assert config["controller_manager"]["ros__parameters"]["netft_broadcaster"] == {
+        "type": "force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster"
+    }
+    assert config["netft_broadcaster"]["ros__parameters"]["sensor_name"] == (
+        "netft_sensor"
+    )

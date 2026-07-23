@@ -24,6 +24,14 @@ ROS1_PARAMETER_TYPES = {
     "configuration_connect_timeout": "double",
     "configuration_timeout": "double",
 }
+ROS2_CONTROL_HARDWARE_ARGUMENT_DEFAULTS = {
+    "sensor_name": "netft_sensor",
+    **EXPECTED_ARGUMENT_DEFAULTS,
+    "counts_per_force": "1000000",
+    "counts_per_torque": "1000000",
+    "receive_timeout": "0.1",
+    "activation_timeout": "2.0",
+}
 
 
 def call_name(call):
@@ -70,6 +78,33 @@ def launch_parameter_types(tree):
     return result
 
 
+def native_string_value_names(tree):
+    assignment = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_nodes"
+        for node in node.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "values"
+            for target in node.targets
+        )
+    )
+    assert isinstance(assignment.value, ast.DictComp)
+    assert len(assignment.value.generators) == 1
+    generator = assignment.value.generators[0]
+    assert isinstance(generator.target, ast.Name) and generator.target.id == "name"
+    assert isinstance(generator.iter, ast.Tuple)
+    assert call_name(assignment.value.value) == "perform"
+    configuration = assignment.value.value.func.value
+    assert isinstance(configuration, ast.Call)
+    assert call_name(configuration) == "LaunchConfiguration"
+    assert isinstance(configuration.args[0], ast.Name)
+    assert configuration.args[0].id == "name"
+    return {string_value(item) for item in generator.iter.elts}
+
+
 def test_ros1_launch_exposes_typed_automatic_sensor_calibration_defaults():
     root = ElementTree.parse(ROOT / "launch/netft.launch").getroot()
     arguments = {argument.attrib["name"]: argument.attrib["default"] for argument in root.findall("arg")}
@@ -103,13 +138,17 @@ def test_ros2_launch_passes_native_automatic_sensor_calibration_types():
     } == EXPECTED_PARAMETER_TYPES
 
 
-def test_ros2_control_launch_exposes_xacro_connection_defaults():
+def test_ros2_control_launch_passes_native_strings_for_every_hardware_argument():
     tree = ast.parse(
         (ROOT / "launch/netft_ros2_control.launch.py").read_text(encoding="utf-8")
     )
     arguments = declared_arguments(tree)
-    assert {name: arguments.get(name) for name in EXPECTED_ARGUMENT_DEFAULTS} == (
-        EXPECTED_ARGUMENT_DEFAULTS
+    assert {
+        name: arguments.get(name)
+        for name in ROS2_CONTROL_HARDWARE_ARGUMENT_DEFAULTS
+    } == ROS2_CONTROL_HARDWARE_ARGUMENT_DEFAULTS
+    assert native_string_value_names(tree) == set(
+        ROS2_CONTROL_HARDWARE_ARGUMENT_DEFAULTS
     )
     values = {
         node.slice.value
@@ -120,4 +159,4 @@ def test_ros2_control_launch_exposes_xacro_connection_defaults():
         and isinstance(node.slice, ast.Constant)
         and isinstance(node.slice.value, str)
     }
-    assert set(EXPECTED_ARGUMENT_DEFAULTS) <= values
+    assert values == set(ROS2_CONTROL_HARDWARE_ARGUMENT_DEFAULTS)

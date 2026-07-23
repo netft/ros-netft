@@ -131,6 +131,10 @@ wrist_ft_broadcaster:
     frame_id: wrist_ft_link
 ```
 
+That YAML configures only the controller manager and broadcaster. Hardware
+endpoint, calibration, and timeout values come from the robot description's
+Xacro-generated `<hardware>` element.
+
 Spawn the broadcaster through the controller manager used by the robot:
 
 ```bash

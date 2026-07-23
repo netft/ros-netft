@@ -19,8 +19,12 @@ def _nodes(context):
             "sensor_port",
             "http_port",
             "use_sensor_calibration",
+            "counts_per_force",
+            "counts_per_torque",
+            "receive_timeout",
             "configuration_connect_timeout",
             "configuration_timeout",
+            "activation_timeout",
         )
     }
     wrapper = f"""<?xml version='1.0'?>
@@ -31,8 +35,12 @@ def _nodes(context):
     sensor_name='{values['sensor_name']}' sensor_ip='{values['sensor_ip']}'
     sensor_port='{values['sensor_port']}' http_port='{values['http_port']}'
     use_sensor_calibration='{values['use_sensor_calibration']}'
+    counts_per_force='{values['counts_per_force']}'
+    counts_per_torque='{values['counts_per_torque']}'
+    receive_timeout='{values['receive_timeout']}'
     configuration_connect_timeout='{values['configuration_connect_timeout']}'
-    configuration_timeout='{values['configuration_timeout']}'/>
+    configuration_timeout='{values['configuration_timeout']}'
+    activation_timeout='{values['activation_timeout']}'/>
 </robot>"""
     document = minidom.parseString(wrapper)
     xacro.process_doc(document)
@@ -73,10 +81,14 @@ def generate_launch_description():
             DeclareLaunchArgument("sensor_port", default_value="49152"),
             DeclareLaunchArgument("http_port", default_value="80"),
             DeclareLaunchArgument("use_sensor_calibration", default_value="true"),
+            DeclareLaunchArgument("counts_per_force", default_value="1000000"),
+            DeclareLaunchArgument("counts_per_torque", default_value="1000000"),
+            DeclareLaunchArgument("receive_timeout", default_value="0.1"),
             DeclareLaunchArgument(
                 "configuration_connect_timeout", default_value="0.5"
             ),
             DeclareLaunchArgument("configuration_timeout", default_value="1.0"),
+            DeclareLaunchArgument("activation_timeout", default_value="2.0"),
             OpaqueFunction(function=_nodes),
         ]
     )

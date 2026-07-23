@@ -147,6 +147,13 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
       ${std_srvs_TARGETS}
       ${diagnostic_msgs_TARGETS}
     )
+    if(
+      CMAKE_SYSTEM_NAME STREQUAL "Linux"
+      AND CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang)$"
+    )
+      target_link_options(${target} PRIVATE
+        "LINKER:--exclude-libs,libnetft_core.a:libnetft_ros_support.a")
+    endif()
   endfunction()
 
   add_library(netft_ros2_control SHARED src/netft_hardware_interface.cpp)
@@ -284,6 +291,12 @@ elseif(NETFT_ROS_VERSION STREQUAL "2")
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
       TIMEOUT 90
+    )
+    add_test(
+      NAME netft_ros2_control_symbol_audit
+      COMMAND
+        "${CMAKE_CURRENT_SOURCE_DIR}/test/integration/audit_ros2_control_symbols.sh"
+        "$<TARGET_FILE:netft_ros2_control>"
     )
     ament_add_pytest_test(netft_ros2_smoke_harness test/test_shell_harness.py
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
