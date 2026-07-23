@@ -12,10 +12,6 @@ command -v "$nm_tool" >/dev/null
 for plugin in "$@"; do
   test -f "$plugin"
   symbols="$("$nm_tool" -D --defined-only --demangle "$plugin")"
-  if ! grep -q 'netft_driver::NetFTHardwareInterface' <<<"$symbols"; then
-    echo "production ros2_control plugin export is missing: $plugin" >&2
-    exit 1
-  fi
   private_symbols="$(
     sed -E 's/^[[:xdigit:]]+[[:space:]]+[[:alpha:]][[:space:]]+//' <<<"$symbols" |
       grep -E \

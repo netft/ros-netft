@@ -344,7 +344,7 @@ boundaries.
 
 ## Core provenance and licenses
 
-`src/core/` is a private, immutable snapshot of the `netft-cpp` v0.1.2 library. It is included in this source package and does not require an external `netft-cpp` build dependency. The snapshot retains the upstream `netft` namespace and is licensed under Apache-2.0; the ROS integration around it remains MIT-licensed.
+`src/core/` is a private, immutable snapshot of the `netft-cpp` v0.1.2 library. It is included in this source package and does not require an external `netft-cpp` build dependency. The snapshot retains the upstream `netft` namespace and is licensed under Apache-2.0. On standard libraries without floating-point `std::from_chars`, the build selects the Apache-2.0 `src/compat/xml_config.cpp` compatibility translation unit. All other ROS integration code remains MIT-licensed.
 
 ## Contributing
 
@@ -354,4 +354,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an
 
 ## License
 
-The ROS integration is MIT-licensed; see [LICENSE](LICENSE). `src/core/` is Apache-2.0; see [src/core/LICENSE](src/core/LICENSE).
+The ROS integration is MIT-licensed; see [LICENSE](LICENSE). The `src/core/` snapshot and its derived `src/compat/xml_config.cpp` compatibility translation unit are Apache-2.0; see [src/core/LICENSE](src/core/LICENSE).

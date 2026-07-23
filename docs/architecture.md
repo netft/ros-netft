@@ -6,7 +6,7 @@ operator procedures, and safety guidance.
 
 ## Package boundaries
 
-The active transport implementation is a private snapshot of netft-cpp under `src/core`. It is built as `netft_core`, uses the `netft` namespace, contains no ROS headers, and is not installed as a public SDK. `netft::Client` is the single client used by the command-line tool, standalone nodes, and ros2_control plugin.
+The active transport implementation is a private snapshot of netft-cpp under `src/core`. It is built as `netft_core`, uses the `netft` namespace, contains no ROS headers, and is not installed as a public SDK. When the C++ standard library lacks floating-point `std::from_chars`, CMake substitutes the Apache-2.0 `src/compat/xml_config.cpp` translation unit for the snapshot XML parser. `netft::Client` is the single client used by the command-line tool, standalone nodes, and ros2_control plugin.
 
 ```text
 src/core sources

@@ -23,6 +23,8 @@ int find_testing_library(dl_phdr_info * info, std::size_t, void * data) noexcept
 
 void * testing_library_handle() noexcept
 {
+  // Keep the private test DSO loaded while cached function pointers are in use.
+  // Production unload behavior is exercised through pluginlib, without these hooks.
   static void * const handle = [] {
     const char * library_path = nullptr;
     (void)::dl_iterate_phdr(find_testing_library, &library_path);

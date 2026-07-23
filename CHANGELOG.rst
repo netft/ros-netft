@@ -8,6 +8,8 @@ Changelog for package netft_driver
 * Read sensor-reported calibration by default and convert its native force and torque units to N and Nm.
 * Add the explicit ``use_sensor_calibration=false`` manual override, with counts/N and counts/Nm inputs.
 * Add HTTP configuration port and timeout parameters for sensor calibration discovery.
+* Support Noetic's GCC 9 standard library with an Apache-2.0 XML parser compatibility translation unit.
+* Keep the ros2_control plugin ABI private by hiding core and implementation symbols.
 
 0.2.2 (2026-07-22)
 ------------------
