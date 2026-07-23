@@ -14,7 +14,11 @@ target_link_libraries(netft_status PRIVATE netft_core GTest::gtest_main)
 add_test(NAME netft_status COMMAND netft_status)
 
 add_executable(netft_diagnostics test_diagnostics.cpp)
-target_link_libraries(netft_diagnostics PRIVATE netft_core GTest::gtest_main)
+target_include_directories(netft_diagnostics PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+target_link_libraries(netft_diagnostics PRIVATE
+  netft_ros_support
+  netft_sdk_core
+  GTest::gtest_main)
 add_test(NAME netft_diagnostics COMMAND netft_diagnostics)
 
 add_executable(netft_client test_client.cpp support/fake_sensor.cpp)

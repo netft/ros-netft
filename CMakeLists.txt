@@ -35,7 +35,9 @@ target_include_directories(netft_sdk_core
 )
 target_link_libraries(netft_sdk_core PUBLIC Threads::Threads CURL::libcurl)
 
-add_library(netft_ros_support STATIC src/ros/unit_conversion.cpp)
+add_library(netft_ros_support STATIC
+  src/ros/unit_conversion.cpp
+  src/ros/diagnostics.cpp)
 set_target_properties(netft_ros_support PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(netft_ros_support PUBLIC cxx_std_17)
 target_include_directories(netft_ros_support
