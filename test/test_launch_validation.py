@@ -105,6 +105,15 @@ def native_string_value_names(tree):
     return {string_value(item) for item in generator.iter.elts}
 
 
+def subscript_string_value(node):
+    value = node.slice
+    if isinstance(value, ast.Index):
+        value = value.value
+    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+        return value.value
+    return None
+
+
 def test_ros1_launch_exposes_typed_automatic_sensor_calibration_defaults():
     root = ElementTree.parse(ROOT / "launch/netft.launch").getroot()
     arguments = {argument.attrib["name"]: argument.attrib["default"] for argument in root.findall("arg")}
@@ -151,12 +160,11 @@ def test_ros2_control_launch_passes_native_strings_for_every_hardware_argument()
         ROS2_CONTROL_HARDWARE_ARGUMENT_DEFAULTS
     )
     values = {
-        node.slice.value
+        subscript_string_value(node)
         for node in ast.walk(tree)
         if isinstance(node, ast.Subscript)
         and isinstance(node.value, ast.Name)
         and node.value.id == "values"
-        and isinstance(node.slice, ast.Constant)
-        and isinstance(node.slice.value, str)
+        and subscript_string_value(node) is not None
     }
     assert values == set(ROS2_CONTROL_HARDWARE_ARGUMENT_DEFAULTS)

@@ -13,7 +13,7 @@ def workflow_run_blocks(path):
         if not stripped.startswith("run:"):
             continue
         indent = len(line) - len(stripped)
-        scalar = stripped.removeprefix("run:").strip()
+        scalar = stripped[len("run:") :].strip()
         if scalar not in {"|", ">-"}:
             blocks.append(scalar)
             continue
