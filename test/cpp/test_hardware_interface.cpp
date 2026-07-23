@@ -982,7 +982,11 @@ TEST(NetFTHardwareInterface, TwoInstancesHaveIsolatedServicesDiagnosticsAndFault
   ASSERT_DOUBLE_EQ(axis_value(right_axis), 1.0);
   const auto right_commands_before_fault = right.commands();
   left.pause();
-  right.queue_record(900, 0, 9000, {900, -800, 700, 60, -50, 40});
+  for (std::uint32_t offset = 0; offset < 250; ++offset) {
+    right.queue_record(
+      900 + offset, 0, 9000 + 4 * offset,
+      {900, -800, 700, 60, -50, 40});
+  }
   hardware_interface::HardwareReadWriteStatus read_status;
   ASSERT_TRUE(eventually([&] {
     read_status = manager->read(
