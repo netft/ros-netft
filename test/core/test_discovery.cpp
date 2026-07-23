@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <locale>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -126,12 +127,52 @@ TEST_P(InvalidXmlCount, RejectsInvalidCounts) {
 INSTANTIATE_TEST_SUITE_P(
     EveryInvalidForm, InvalidXmlCount,
     ::testing::Values(InvalidCountCase{"cfgcpf", "not-a-number"},
-                      InvalidCountCase{"cfgcpf", "10remaining"}, InvalidCountCase{"cfgcpf", "0"},
-                      InvalidCountCase{"cfgcpf", "-1"}, InvalidCountCase{"cfgcpf", "NaN"},
-                      InvalidCountCase{"cfgcpf", "inf"}, InvalidCountCase{"cfgcpt", "not-a-number"},
+                      InvalidCountCase{"cfgcpf", "10remaining"}, InvalidCountCase{"cfgcpf", "+1"},
+                      InvalidCountCase{"cfgcpf", "0x1p2"}, InvalidCountCase{"cfgcpf", "1e"},
+                      InvalidCountCase{"cfgcpf", "0"}, InvalidCountCase{"cfgcpf", "-1"},
+                      InvalidCountCase{"cfgcpf", "NaN"}, InvalidCountCase{"cfgcpf", "inf"},
+                      InvalidCountCase{"cfgcpt", "not-a-number"},
                       InvalidCountCase{"cfgcpt", "10remaining"}, InvalidCountCase{"cfgcpt", "0"},
                       InvalidCountCase{"cfgcpt", "-1"}, InvalidCountCase{"cfgcpt", "NaN"},
                       InvalidCountCase{"cfgcpt", "infinity"}));
+
+TEST(XmlConfiguration, AcceptsGeneralDecimalCountForms) {
+  constexpr std::array<std::pair<std::string_view, double>, 4> cases{{
+      {".5", 0.5},
+      {"1.", 1.0},
+      {"1e+2", 100.0},
+      {"2.5E-1", 0.25},
+  }};
+
+  for (const auto &[spelling, expected] : cases) {
+    SCOPED_TRACE(spelling);
+    const auto result =
+        netft::detail::parse_sensor_configuration(replace_value(kValidXml, "cfgcpf", spelling));
+    EXPECT_DOUBLE_EQ(result.calibration.counts_per_force_unit, expected);
+  }
+}
+
+class CommaDecimalPoint final : public std::numpunct<char> {
+ protected:
+  char do_decimal_point() const override { return ','; }
+};
+
+TEST(XmlConfiguration, ParsesCountsIndependentlyOfTheGlobalLocale) {
+  const auto original_locale = std::locale();
+  std::locale::global(std::locale{std::locale::classic(), new CommaDecimalPoint});
+  try {
+    const auto result =
+        netft::detail::parse_sensor_configuration(replace_value(kValidXml, "cfgcpf", "1.25"));
+    EXPECT_DOUBLE_EQ(result.calibration.counts_per_force_unit, 1.25);
+    EXPECT_THROW(
+        netft::detail::parse_sensor_configuration(replace_value(kValidXml, "cfgcpf", "1,25")),
+        netft::DiscoveryError);
+  } catch (...) {
+    std::locale::global(original_locale);
+    throw;
+  }
+  std::locale::global(original_locale);
+}
 
 TEST(XmlConfiguration, TrimsAsciiWhitespaceAroundEveryValue) {
   auto xml = replace_value(kValidXml, "prodname", " \tEthernet Axia\r\n");

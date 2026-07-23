@@ -11,7 +11,30 @@ option(NETFT_INSTALL_TEST_TOOLS "Install private integration-test tools" OFF)
 find_package(Threads REQUIRED)
 find_package(CURL 7.62 REQUIRED)
 
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles(
+  [=[
+    #include <charconv>
+    #include <system_error>
+
+    int main() {
+      const char input[] = "1";
+      double value{};
+      const auto result =
+        std::from_chars(input, input + 1, value, std::chars_format::general);
+      return result.ec == std::errc{} ? 0 : 1;
+    }
+  ]=]
+  NETFT_HAS_FLOAT_FROM_CHARS)
+
 set(NETFT_SNAPSHOT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/core")
+if(NETFT_HAS_FLOAT_FROM_CHARS)
+  set(NETFT_XML_CONFIG_SOURCE
+    "${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/xml_config.cpp")
+else()
+  set(NETFT_XML_CONFIG_SOURCE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compat/xml_config.cpp")
+endif()
 set(NETFT_SNAPSHOT_SOURCES
   src/core/src/types.cpp
   src/core/src/status.cpp
@@ -22,7 +45,7 @@ set(NETFT_SNAPSHOT_SOURCES
   src/core/src/detail/posix_transport.cpp
   src/core/src/detail/protocol.cpp
   src/core/src/detail/sequence.cpp
-  src/core/src/detail/xml_config.cpp
+  ${NETFT_XML_CONFIG_SOURCE}
 )
 
 add_library(netft_core STATIC ${NETFT_SNAPSHOT_SOURCES})

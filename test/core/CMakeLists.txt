@@ -35,7 +35,12 @@ add_netft_snapshot_test(netft_snapshot_fault_latch
 add_netft_snapshot_test(netft_snapshot_discovery
   test_discovery.cpp
   support/fake_http_server.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/xml_config.cpp)
+  ${NETFT_XML_CONFIG_SOURCE})
+
+add_netft_snapshot_test(netft_compat_discovery
+  test_discovery.cpp
+  support/fake_http_server.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/compat/xml_config.cpp)
 
 add_netft_snapshot_test(netft_snapshot_client_stream
   test_client_stream.cpp
@@ -53,7 +58,7 @@ add_library(netft_snapshot_client_impl_test STATIC
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/posix_transport.cpp
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/protocol.cpp
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/sequence.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/xml_config.cpp)
+  ${NETFT_XML_CONFIG_SOURCE})
 target_include_directories(netft_snapshot_client_impl_test PRIVATE
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src)
 target_link_libraries(netft_snapshot_client_impl_test PUBLIC netft_core)
