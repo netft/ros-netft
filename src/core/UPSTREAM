@@ -1,5 +1,5 @@
 repository=https://github.com/netft/netft-cpp.git
-tag=v0.2.2
-commit=e424c401587052f03de9b94f76f1e86b78902105
+tag=v0.3.0
+commit=46ee05639f818a17c1cfe604d0d77b1feb8f9b2b
 license=Apache-2.0
 paths=include/netft,src

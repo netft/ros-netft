@@ -224,8 +224,8 @@ void Client::Impl::start(SampleCallback callback) {
 }
 
 std::thread Client::Impl::create_worker_thread() {
-  if (thread_factory_ != nullptr) {
-    return thread_factory_(this);
+  if (thread_creation_test_hook_ != nullptr) {
+    thread_creation_test_hook_();
   }
   return std::thread([this] { run(); });
 }

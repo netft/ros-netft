@@ -1,4 +1,8 @@
-#include "detail/posix_transport.hpp"
+#include "detail/udp_transport.hpp"
+
+namespace netft::detail {
+using PosixTransport = UdpTransport;
+}
 
 #include <gtest/gtest.h>
 

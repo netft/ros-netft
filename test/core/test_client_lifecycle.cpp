@@ -86,7 +86,7 @@ struct HookGate {
 struct ClientLifecycleTestAccess {
   static void fail_next_thread_creation(netft::Client &client) {
     fail_next = true;
-    client.impl_->thread_factory_ = &create_thread;
+    client.impl_->thread_creation_test_hook_ = &on_thread_creation;
   }
 
   static bool worker_joinable(const netft::Client &client) {
@@ -129,12 +129,11 @@ struct ClientLifecycleTestAccess {
   static void release_waiter() { release_gate(waiter_gate); }
 
 private:
-  static std::thread create_thread(netft::Client::Impl *impl) {
+  static void on_thread_creation() {
     if (fail_next.exchange(false)) {
       throw std::system_error{std::make_error_code(std::errc::resource_unavailable_try_again),
                               "injected thread creation failure"};
     }
-    return std::thread{&netft::Client::Impl::run, impl};
   }
 
   static void reset_gate(HookGate &gate) {

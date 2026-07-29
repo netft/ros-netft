@@ -10,9 +10,9 @@
 #include <thread>
 
 #include "detail/fault_latch.hpp"
-#include "detail/posix_transport.hpp"
 #include "detail/protocol.hpp"
 #include "detail/sequence.hpp"
+#include "detail/udp_transport.hpp"
 #include "netft/client.hpp"
 
 namespace netft {
@@ -64,7 +64,7 @@ private:
   void record_callback_error(const char *message) noexcept;
   void finish_session() noexcept;
 
-  using ThreadFactory = std::thread (*)(Impl *);
+  using ThreadCreationHook = void (*)();
   using FaultPublishedHook = void (*)(Impl *) noexcept;
   using WaitWakeHook = void (*)(Impl *, std::uint64_t) noexcept;
 
@@ -78,7 +78,7 @@ private:
   mutable std::mutex data_mutex_;
   std::condition_variable first_sample_cv_;
   std::thread worker_;
-  ThreadFactory thread_factory_{nullptr};
+  ThreadCreationHook thread_creation_test_hook_{nullptr};
   // Internal synchronization hooks used only by lifecycle tests. Client's
   // installed API remains opaque and does not expose these seams.
   FaultPublishedHook fault_published_test_hook_{nullptr};
@@ -86,7 +86,7 @@ private:
   std::thread::id active_worker_id_;
   bool joining_{false};
   SampleCallback callback_;
-  detail::PosixTransport transport_;
+  detail::UdpTransport transport_;
   detail::RdtSequenceTracker rdt_sequence_;
   detail::FtSequenceTracker ft_sequence_;
   std::atomic<bool> stopping_{false};

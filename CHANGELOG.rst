@@ -4,7 +4,7 @@ Changelog for package netft_driver
 
 0.3.2 (2026-07-29)
 ------------------
-* Update the private ``netft-cpp`` core snapshot to v0.2.2.
+* Update the private ``netft-cpp`` core snapshot to v0.3.0.
 * Retain raw wrench counts in core samples while keeping ROS output in SI units.
 * Use the upstream portable XML parser and remove the obsolete local fallback.
 
