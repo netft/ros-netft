@@ -67,6 +67,7 @@ struct Config {
 
 struct Sample {
   std::uint32_t rdt_sequence{}, ft_sequence{}, status{};
+  std::array<std::int32_t, 6> raw_wrench{};
   std::array<double, 3> force{}, torque{};
   ForceUnit force_unit{ForceUnit::Unknown};
   TorqueUnit torque_unit{TorqueUnit::Unknown};

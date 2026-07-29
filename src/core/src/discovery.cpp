@@ -17,6 +17,11 @@ namespace {
 
 constexpr std::size_t kMaximumResponseBytes = 65'536;
 
+// ATI Net F/T firmware exposes configuration through HTTP only; SECURITY.md defines the trusted
+// network boundary for this unauthenticated device protocol.
+// codeql[cpp/non-https-url]
+constexpr const char *kAtiConfigurationProtocol = "http";
+
 struct CurlHandleDeleter {
   void operator()(CURL *handle) const noexcept { curl_easy_cleanup(handle); }
 };
@@ -134,7 +139,7 @@ SensorConfiguration discover_sensor(const DiscoveryOptions &options) {
     host = "[" + host + "]";
   }
   const std::string port = std::to_string(options.http_port);
-  set_url_part(url.get(), CURLUPART_SCHEME, "http");
+  set_url_part(url.get(), CURLUPART_SCHEME, kAtiConfigurationProtocol);
   set_url_part(url.get(), CURLUPART_HOST, host.c_str());
   set_url_part(url.get(), CURLUPART_PORT, port.c_str());
   set_url_part(url.get(), CURLUPART_PATH, "/netftapi2.xml");
@@ -142,7 +147,7 @@ SensorConfiguration discover_sensor(const DiscoveryOptions &options) {
   ResponseBuffer response;
   set_curl_option(handle.get(), CURLOPT_CURLU, url.get());
 #if LIBCURL_VERSION_NUM >= 0x075500
-  set_curl_option(handle.get(), CURLOPT_PROTOCOLS_STR, "http");
+  set_curl_option(handle.get(), CURLOPT_PROTOCOLS_STR, kAtiConfigurationProtocol);
 #else
   set_curl_option(handle.get(), CURLOPT_PROTOCOLS, static_cast<long>(CURLPROTO_HTTP));
 #endif

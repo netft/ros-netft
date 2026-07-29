@@ -96,7 +96,9 @@ TEST(ClientStream, ConvertsNativeUnitsAndPublishesLatestSample) {
   netft::test::FakeSensor sensor;
   sensor.pause();
   sensor.queue_record(1, 0, 100,
-                      {1'000'000, -2'000'000, 3'000'000, 1'000'000, -2'000'000, 3'000'000});
+                      {1'000'000, -2'000'000, 3'000'000, 4'000'000, -5'000'000, 6'000'000});
+  const std::array<std::int32_t, 6> expected_raw{1'000'000, -2'000'000, 3'000'000,
+                                                 4'000'000, -5'000'000, 6'000'000};
   netft::Client client{config_for(sensor)};
   std::mutex callback_mutex;
   std::optional<netft::Sample> callback_sample;
@@ -115,8 +117,9 @@ TEST(ClientStream, ConvertsNativeUnitsAndPublishesLatestSample) {
   ASSERT_TRUE(sample);
   EXPECT_EQ(sample->rdt_sequence, 1U);
   EXPECT_EQ(sample->ft_sequence, 100U);
+  EXPECT_EQ(sample->raw_wrench, expected_raw);
   EXPECT_EQ(sample->force, (std::array<double, 3>{1.0, -2.0, 3.0}));
-  EXPECT_EQ(sample->torque, (std::array<double, 3>{1.0, -2.0, 3.0}));
+  EXPECT_EQ(sample->torque, (std::array<double, 3>{4.0, -5.0, 6.0}));
   EXPECT_EQ(sample->force_unit, netft::ForceUnit::Newton);
   EXPECT_EQ(sample->torque_unit, netft::TorqueUnit::NewtonMeter);
   EXPECT_EQ(sample->configuration_revision, 1U);
@@ -124,6 +127,7 @@ TEST(ClientStream, ConvertsNativeUnitsAndPublishesLatestSample) {
     std::lock_guard<std::mutex> lock(callback_mutex);
     ASSERT_TRUE(callback_sample);
     EXPECT_EQ(callback_sample->rdt_sequence, sample->rdt_sequence);
+    EXPECT_EQ(callback_sample->raw_wrench, expected_raw);
     EXPECT_EQ(callback_sample->force, sample->force);
     EXPECT_EQ(callback_sample->torque, sample->torque);
   }
