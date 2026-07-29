@@ -21,7 +21,7 @@ set(NETFT_SNAPSHOT_SOURCES
   src/core/src/client.cpp
   src/core/src/detail/client_impl.cpp
   src/core/src/detail/fault_latch.cpp
-  src/core/src/detail/posix_transport.cpp
+  src/core/src/detail/udp_transport_posix.cpp
   src/core/src/detail/protocol.cpp
   src/core/src/detail/sequence.cpp
   ${NETFT_XML_CONFIG_SOURCE}

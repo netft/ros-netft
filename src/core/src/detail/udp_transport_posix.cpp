@@ -1,4 +1,4 @@
-#include "detail/posix_transport.hpp"
+#include "detail/udp_transport.hpp"
 
 #include <netdb.h>
 #include <poll.h>
@@ -26,11 +26,13 @@ int timeout_milliseconds(const std::chrono::duration<double> timeout) {
   return static_cast<int>(milliseconds);
 }
 
+constexpr std::uintptr_t kInvalidSocket = ~std::uintptr_t{0};
+
 } // namespace
 
-PosixTransport::~PosixTransport() { close(); }
+UdpTransport::~UdpTransport() { close(); }
 
-void PosixTransport::connect(const std::string &host, const int port) {
+void UdpTransport::connect(const std::string &host, const int port) {
   addrinfo hints{};
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_DGRAM;
@@ -64,18 +66,19 @@ void PosixTransport::connect(const std::string &host, const int port) {
   }
 
   std::scoped_lock lock(mutex_);
-  if (socket_ >= 0) {
-    ::close(socket_);
+  if (socket_ != kInvalidSocket) {
+    ::close(static_cast<int>(socket_));
   }
-  socket_ = connected_socket;
+  socket_ = static_cast<std::uintptr_t>(connected_socket);
+  shutdown_requested_ = false;
 }
 
-void PosixTransport::send(const std::array<std::uint8_t, 8> &request) {
+void UdpTransport::send(const std::array<std::uint8_t, 8> request) {
   std::scoped_lock lock(mutex_);
-  if (socket_ < 0) {
+  if (socket_ == kInvalidSocket) {
     throw std::runtime_error("UDP socket is not connected");
   }
-  const auto sent = ::send(socket_, request.data(), request.size(), 0);
+  const auto sent = ::send(static_cast<int>(socket_), request.data(), request.size(), 0);
   if (sent < 0) {
     throw socket_error("failed to send UDP request");
   }
@@ -84,21 +87,31 @@ void PosixTransport::send(const std::array<std::uint8_t, 8> &request) {
   }
 }
 
-std::size_t PosixTransport::receive(std::uint8_t *data, const std::size_t capacity,
-                                    const std::chrono::duration<double> timeout) {
+std::size_t UdpTransport::receive(std::uint8_t *data, const std::size_t capacity,
+                                  const std::chrono::duration<double> timeout) {
   int socket = -1;
+  WaitStartedTestHook wait_started_hook = nullptr;
+  void *wait_started_context = nullptr;
   {
     std::scoped_lock lock(mutex_);
-    socket = socket_;
-  }
-  if (socket < 0) {
-    throw std::runtime_error("UDP socket is not connected");
+    if (socket_ == kInvalidSocket) {
+      throw std::runtime_error("UDP socket is not connected");
+    }
+    if (shutdown_requested_) {
+      return 0;
+    }
+    socket = static_cast<int>(socket_);
+    wait_started_hook = wait_started_test_hook_;
+    wait_started_context = wait_started_test_context_;
   }
 
   pollfd descriptor{socket, POLLIN, 0};
   const auto deadline = std::chrono::steady_clock::now() + timeout;
   auto remaining = timeout;
   int poll_result{};
+  if (wait_started_hook != nullptr) {
+    wait_started_hook(wait_started_context);
+  }
   while (true) {
     poll_result = ::poll(&descriptor, 1, timeout_milliseconds(remaining));
     if (poll_result >= 0) {
@@ -117,6 +130,12 @@ std::size_t PosixTransport::receive(std::uint8_t *data, const std::size_t capaci
   if (poll_result == 0) {
     return 0;
   }
+  {
+    std::scoped_lock lock(mutex_);
+    if (shutdown_requested_) {
+      return 0;
+    }
+  }
   if ((descriptor.revents & POLLNVAL) != 0) {
     throw std::runtime_error("UDP socket became invalid");
   }
@@ -131,18 +150,20 @@ std::size_t PosixTransport::receive(std::uint8_t *data, const std::size_t capaci
   return static_cast<std::size_t>(received);
 }
 
-void PosixTransport::shutdown() noexcept {
+void UdpTransport::shutdown() noexcept {
   std::scoped_lock lock(mutex_);
-  if (socket_ >= 0) {
-    static_cast<void>(::shutdown(socket_, SHUT_RDWR));
+  shutdown_requested_ = true;
+  if (socket_ != kInvalidSocket) {
+    static_cast<void>(::shutdown(static_cast<int>(socket_), SHUT_RDWR));
   }
 }
 
-void PosixTransport::close() noexcept {
+void UdpTransport::close() noexcept {
   std::scoped_lock lock(mutex_);
-  if (socket_ >= 0) {
-    ::close(socket_);
-    socket_ = -1;
+  shutdown_requested_ = true;
+  if (socket_ != kInvalidSocket) {
+    ::close(static_cast<int>(socket_));
+    socket_ = kInvalidSocket;
   }
 }
 

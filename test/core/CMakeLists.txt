@@ -34,7 +34,7 @@ add_netft_snapshot_test(netft_snapshot_fault_latch
 
 add_executable(netft_snapshot_posix_transport
   test_posix_transport.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/posix_transport.cpp)
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/udp_transport_posix.cpp)
 target_compile_features(netft_snapshot_posix_transport PRIVATE cxx_std_17)
 target_include_directories(netft_snapshot_posix_transport PRIVATE
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src)
@@ -65,7 +65,7 @@ add_netft_snapshot_test(netft_snapshot_client_recovery
 add_library(netft_snapshot_client_impl_test STATIC
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/client_impl.cpp
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/fault_latch.cpp
-  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/posix_transport.cpp
+  ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/udp_transport_posix.cpp
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/protocol.cpp
   ${NETFT_SNAPSHOT_SOURCE_DIR}/src/detail/sequence.cpp
   ${NETFT_XML_CONFIG_SOURCE})

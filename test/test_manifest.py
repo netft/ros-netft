@@ -219,3 +219,18 @@ def test_repository_keeps_one_private_vendored_core():
     assert not gitmodules.exists() or "netft" not in gitmodules.read_text(
         encoding="utf-8"
     ).lower()
+
+
+def test_private_core_snapshot_tracks_netft_cpp_0_3_0():
+    metadata = dict(
+        line.split("=", 1)
+        for line in (ROOT / "src/core/UPSTREAM").read_text(encoding="utf-8").splitlines()
+        if line
+    )
+    assert metadata["repository"] == "https://github.com/netft/netft-cpp.git"
+    assert metadata["tag"] == "v0.3.0"
+    assert metadata["commit"] == "46ee05639f818a17c1cfe604d0d77b1feb8f9b2b"
+
+    cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert "src/core/src/detail/udp_transport_posix.cpp" in cmake
+    assert "src/core/src/detail/posix_transport.cpp" not in cmake
