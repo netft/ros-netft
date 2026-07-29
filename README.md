@@ -1,9 +1,10 @@
 # ROS Net F/T Driver
 
 [![CI](https://github.com/netft/ros-netft/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/netft/ros-netft/actions/workflows/ci.yml)
-[![Codecov](https://codecov.io/gh/netft/ros-netft/graph/badge.svg?branch=main)](https://app.codecov.io/gh/netft/ros-netft)
+[![Coverage](https://codecov.io/gh/netft/ros-netft/graph/badge.svg?branch=main)](https://codecov.io/gh/netft/ros-netft)
+[![Release](https://img.shields.io/github/v/release/netft/ros-netft?display_name=tag&sort=semver)](https://github.com/netft/ros-netft/releases)
 [![ROS](https://img.shields.io/badge/ROS-1%20%7C%202-22314E.svg?logo=ros&logoColor=white)](https://www.ros.org/)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/github/license/netft/ros-netft?label=license)](LICENSE)
 
 `netft_driver` acquires force and torque data from ATI Ethernet Net F/T and
 Ethernet Axia sensors over the UDP Raw Data Transfer (RDT) protocol. A native
