@@ -72,9 +72,8 @@ so the scope can be agreed upon first.
 2. Copy only the library paths from an immutable upstream tag.
 3. Preserve the `netft` namespace and the Apache-2.0 license.
 4. Update `src/core/UPSTREAM` with the copied tag and commit.
-5. Keep the Apache-2.0 `src/compat/xml_config.cpp` fallback synchronized with the copied upstream XML parser.
-6. Rerun the byte comparison and every snapshot and ROS test.
-7. Keep ROS-specific changes out of `src/core/`; port reusable fixes upstream before copying them back.
+5. Rerun the byte comparison and every snapshot and ROS test.
+6. Keep ROS-specific changes out of `src/core/`; port reusable fixes upstream before copying them back.
 
 Do not add an automated downloader or submodule for the core snapshot.
 

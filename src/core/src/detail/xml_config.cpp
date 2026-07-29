@@ -1,10 +1,12 @@
 #include "detail/xml_config.hpp"
 
 #include <array>
-#include <charconv>
+#include <cfenv>
 #include <cmath>
+#include <exception>
+#include <locale>
+#include <sstream>
 #include <string>
-#include <system_error>
 #include <vector>
 
 #include "netft/discovery.hpp"
@@ -63,6 +65,46 @@ struct OpenElement {
 };
 
 using RequiredFields = std::array<std::string, kRequiredTags.size()>;
+
+class ScopedRoundToNearest {
+public:
+  ScopedRoundToNearest() {
+    if (std::feholdexcept(&environment_) != 0) {
+      throw DiscoveryError("failed to hold the floating-point environment");
+    }
+    active_ = true;
+
+    const int rounding_mode = std::fegetround();
+    if (rounding_mode == -1) {
+      restore_environment_or_terminate();
+      throw DiscoveryError("failed to inspect the floating-point rounding mode");
+    }
+    if (rounding_mode != FE_TONEAREST && std::fesetround(FE_TONEAREST) != 0) {
+      restore_environment_or_terminate();
+      throw DiscoveryError("failed to select round-to-nearest floating-point parsing");
+    }
+  }
+
+  ~ScopedRoundToNearest() {
+    if (active_) {
+      restore_environment_or_terminate();
+    }
+  }
+
+  ScopedRoundToNearest(const ScopedRoundToNearest &) = delete;
+  ScopedRoundToNearest &operator=(const ScopedRoundToNearest &) = delete;
+
+private:
+  void restore_environment_or_terminate() noexcept {
+    active_ = false;
+    if (std::fesetenv(&environment_) != 0) {
+      std::terminate();
+    }
+  }
+
+  std::fenv_t environment_{};
+  bool active_{false};
+};
 
 void append_required_text(const std::vector<OpenElement> &elements, RequiredFields &fields,
                           std::string_view text) {
@@ -184,11 +226,13 @@ RequiredFields extract_required_fields(std::string_view xml) {
 }
 
 double parse_positive_count(std::string_view value, std::string_view tag) {
+  const ScopedRoundToNearest rounding_mode;
   double result{};
-  const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result,
-                                      std::chars_format::general);
-  if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() ||
-      !std::isfinite(result) || result <= 0.0) {
+  std::istringstream input{std::string{value}};
+  input.imbue(std::locale::classic());
+  input >> std::noskipws >> result;
+  if (value.empty() || value.front() == '+' || !input ||
+      input.peek() != std::char_traits<char>::eof() || !std::isfinite(result) || result <= 0.0) {
     throw DiscoveryError("sensor configuration field '" + std::string{tag} +
                          "' must be a finite positive number");
   }

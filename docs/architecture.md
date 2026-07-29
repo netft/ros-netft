@@ -6,7 +6,7 @@ operator procedures, and safety guidance.
 
 ## Package boundaries
 
-The active transport implementation is a private snapshot of netft-cpp under `src/core`. It is built as `netft_core`, uses the `netft` namespace, contains no ROS headers, and is not installed as a public SDK. When the C++ standard library lacks floating-point `std::from_chars`, CMake substitutes the Apache-2.0 `src/compat/xml_config.cpp` translation unit for the snapshot XML parser. `netft::Client` is the single client used by the command-line tool, standalone nodes, and ros2_control plugin.
+The active transport implementation is a private snapshot of netft-cpp under `src/core`. It is built as `netft_core`, uses the `netft` namespace, contains no ROS headers, and is not installed as a public SDK. `netft::Client` is the single client used by the command-line tool, standalone nodes, and ros2_control plugin.
 
 ```text
 src/core sources
@@ -44,7 +44,7 @@ order, and force and torque use independent counts-per-unit scales.
 
 Within the private snapshot, `src/core/src/detail/protocol.cpp` owns exact request construction and 36-byte record parsing, the sequence and fault-latch components own RDT/FT progress and first-fault semantics, and `src/core/src/detail/posix_transport.cpp` owns the UDP transport. `netft::Client` is the public face of the snapshot: it fetches sensor calibration over HTTP unless an override is supplied, manages streaming and recovery, converts counts to the sensor's declared engineering units, invokes the sample callback, and exposes an immutable health snapshot.
 
-The snapshot deliberately stops at native engineering units. `netft::Sample` carries both scaled values and force/torque unit tags. `netft_driver::to_si_sample()` in `netft_ros_support` is the adapter boundary that converts those values to newtons and newton-metres.
+The snapshot deliberately stops at native engineering units. `netft::Sample` carries raw counts, scaled values, and force/torque unit tags. `netft_driver::to_si_sample()` in `netft_ros_support` is the adapter boundary that converts the scaled values to newtons and newton-metres.
 
 ATI RDT permits one active UDP client. The driver sends only Start Streaming,
 Stop Streaming, and an explicitly requested Software Bias command; it does

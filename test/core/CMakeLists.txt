@@ -52,11 +52,6 @@ add_netft_snapshot_test(netft_snapshot_discovery
   support/fake_http_server.cpp
   ${NETFT_XML_CONFIG_SOURCE})
 
-add_netft_snapshot_test(netft_compat_discovery
-  test_discovery.cpp
-  support/fake_http_server.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/compat/xml_config.cpp)
-
 add_netft_snapshot_test(netft_snapshot_client_stream
   test_client_stream.cpp
   support/fake_http_server.cpp

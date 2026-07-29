@@ -624,6 +624,7 @@ Client::Impl::handle_record(const detail::RawRecord &record,
   sample.rdt_sequence = record.rdt_sequence;
   sample.ft_sequence = record.ft_sequence;
   sample.status = record.status;
+  sample.raw_wrench = {record.fx, record.fy, record.fz, record.tx, record.ty, record.tz};
   sample.force = {record.fx / calibration.counts_per_force_unit,
                   record.fy / calibration.counts_per_force_unit,
                   record.fz / calibration.counts_per_force_unit};
