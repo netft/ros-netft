@@ -594,12 +594,12 @@ Client::Impl::handle_record(const detail::RawRecord &record,
         outcome = SessionResult::FtBackward;
       }
 
-      const bool drop_reconnect_ft_discontinuity =
-          config_.recovery_policy == RecoveryPolicy::Reconnect &&
-          (ft.kind == detail::FtSequenceKind::Stall || ft.kind == detail::FtSequenceKind::Backward);
-      if (drop_reconnect_ft_discontinuity) {
+      const bool ft_discontinuity =
+          ft.kind == detail::FtSequenceKind::Stall || ft.kind == detail::FtSequenceKind::Backward;
+      if (ft_discontinuity) {
         deliver = false;
-        if (outcome == SessionResult::FtStall || outcome == SessionResult::FtBackward) {
+        if (config_.recovery_policy == RecoveryPolicy::Reconnect &&
+            (outcome == SessionResult::FtStall || outcome == SessionResult::FtBackward)) {
           outcome.reset();
         }
       }
