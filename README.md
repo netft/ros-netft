@@ -345,7 +345,7 @@ boundaries.
 
 ## Core provenance and licenses
 
-`src/core/` is a private, immutable snapshot of the `netft-cpp` v0.3.0 library. It is included in this source package and does not require an external `netft-cpp` build dependency. The snapshot retains the upstream `netft` namespace.
+`src/core/` is a private, immutable snapshot of the `netft-cpp` v0.3.1 library. It is included in this source package and does not require an external `netft-cpp` build dependency. The snapshot retains the upstream `netft` namespace.
 
 ## Contributing
 
