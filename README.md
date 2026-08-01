@@ -1,6 +1,7 @@
 # ROS Net F/T Driver
 
 [![CI](https://github.com/netft/ros-netft/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/netft/ros-netft/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/netft/ros-netft/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/netft/ros-netft/actions/workflows/codeql.yml)
 [![Coverage](https://codecov.io/gh/netft/ros-netft/graph/badge.svg?branch=main)](https://codecov.io/gh/netft/ros-netft)
 [![Release](https://img.shields.io/github/v/release/netft/ros-netft?display_name=tag&sort=semver)](https://github.com/netft/ros-netft/releases)
 [![ROS](https://img.shields.io/badge/ROS-1%20%7C%202-22314E.svg?logo=ros&logoColor=white)](https://www.ros.org/)
@@ -278,6 +279,18 @@ Set `use_sensor_calibration=false` only when an explicit manual calibration is r
 
 With automatic configuration, an unreachable HTTP endpoint, connection or total timeout, non-200 response, oversized response, or invalid configuration prevents a session from starting. The standalone driver reports the configuration failure in diagnostics and retries through its normal reconnect backoff. The `ros2_control` plugin is fail-stop, so activation fails until the configuration issue is corrected and the component is activated again.
 
+## Security
+
+ATI configuration discovery uses unauthenticated HTTP and RDT streaming uses
+unauthenticated UDP. Operate the sensor, ROS host, and controller on a trusted,
+isolated network; do not expose the device protocols directly to the Internet
+or an untrusted shared network. Treat discovered configuration and received
+samples as unauthenticated input, and validate units, freshness, status, and
+finite values before using them for control.
+
+Report suspected vulnerabilities through the private process in
+[SECURITY.md](SECURITY.md), not a public issue.
+
 ## Operations and safety
 
 On normal shutdown the driver sends Stop Streaming (`0x0000`) and closes its
@@ -345,7 +358,7 @@ boundaries.
 
 ## Core provenance and licenses
 
-`src/core/` is a private, immutable snapshot of the `netft-cpp` v0.3.1 library. It is included in this source package and does not require an external `netft-cpp` build dependency. The snapshot retains the upstream `netft` namespace.
+`src/core/` is a private, immutable snapshot of the `netft-cpp` v0.3.2 library. It is included in this source package and does not require an external `netft-cpp` build dependency. The snapshot retains the upstream `netft` namespace.
 
 ## Contributing
 

@@ -42,7 +42,15 @@ Records contain the RDT sequence, FT sequence, device status, three signed
 force counts, and three signed torque counts. All fields use network byte
 order, and force and torque use independent counts-per-unit scales.
 
-Within the private snapshot, `src/core/src/detail/protocol.cpp` owns exact request construction and 36-byte record parsing, the sequence and fault-latch components own RDT/FT progress and first-fault semantics, and `src/core/src/detail/posix_transport.cpp` owns the UDP transport. `netft::Client` is the public face of the snapshot: it fetches sensor calibration over HTTP unless an override is supplied, manages streaming and recovery, converts counts to the sensor's declared engineering units, invokes the sample callback, and exposes an immutable health snapshot.
+Within the private snapshot, `src/core/src/detail/protocol.cpp` owns exact
+request construction and 36-byte record parsing, the sequence and fault-latch
+components own RDT/FT progress and first-fault semantics, and
+`src/core/src/detail/udp_transport_{posix,windows}.cpp` provide the platform
+transport implementations behind `udp_transport.hpp`. `netft::Client` is the
+public face of the snapshot: it fetches sensor calibration over HTTP unless an
+override is supplied, manages streaming and recovery, converts counts to the
+sensor's declared engineering units, invokes the sample callback, and exposes
+an immutable health snapshot.
 
 The snapshot deliberately stops at native engineering units. `netft::Sample` carries raw counts, scaled values, and force/torque unit tags. `netft_driver::to_si_sample()` in `netft_ros_support` is the adapter boundary that converts the scaled values to newtons and newton-metres.
 

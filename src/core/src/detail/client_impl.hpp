@@ -24,6 +24,7 @@ public:
 
   void start(SampleCallback callback);
   void stop() noexcept;
+  [[nodiscard]] bool called_from_worker_thread() const noexcept;
   void bias();
   bool wait_for_first_sample(std::chrono::duration<double> timeout);
   bool faulted() const noexcept;

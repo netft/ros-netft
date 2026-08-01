@@ -21,6 +21,10 @@ public:
   using SampleCallback = std::function<void(const Sample &)>;
 
   explicit Client(Config config);
+  // Destruction is synchronous except when initiated by the sample callback.
+  // In that case worker shutdown and storage reclamation are deferred because
+  // a callback cannot join its own thread. The callback must not access the
+  // Client after initiating destruction.
   ~Client();
   Client(const Client &) = delete;
   Client &operator=(const Client &) = delete;
