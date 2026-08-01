@@ -1,14 +1,67 @@
 #include "netft/client.hpp"
 
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
 #include <utility>
 
 #include "detail/client_impl.hpp"
 
 namespace netft {
+namespace {
+
+template <typename Value> class DeferredDestroyer {
+public:
+  DeferredDestroyer() : worker_(&DeferredDestroyer::run, this) {}
+
+  void enqueue(std::unique_ptr<Value> value) {
+    {
+      std::scoped_lock lock(mutex_);
+      pending_.push_back(std::move(value));
+    }
+    condition_.notify_one();
+  }
+
+private:
+  void run() noexcept {
+    for (;;) {
+      std::unique_ptr<Value> value;
+      {
+        std::unique_lock<std::mutex> lock(mutex_);
+        condition_.wait(lock, [&] { return !pending_.empty(); });
+        value = std::move(pending_.front());
+        pending_.pop_front();
+      }
+      value->stop();
+    }
+  }
+
+  std::mutex mutex_;
+  std::condition_variable condition_;
+  std::deque<std::unique_ptr<Value>> pending_;
+  std::thread worker_;
+};
+
+template <typename Value> DeferredDestroyer<Value> &deferred_destroyer() {
+  // Callbacks can outlive static teardown. Keeping this worker alive for the
+  // process lifetime avoids both destruction-order races and lost enqueues.
+  static auto *instance = new DeferredDestroyer<Value>;
+  return *instance;
+}
+
+} // namespace
 
 Client::Client(Config config) : impl_(std::make_unique<Impl>(std::move(config))) {}
 
-Client::~Client() { stop(); }
+Client::~Client() {
+  if (impl_ && impl_->called_from_worker_thread()) {
+    impl_->stop();
+    deferred_destroyer<Impl>().enqueue(std::move(impl_));
+    return;
+  }
+  stop();
+}
 
 void Client::start(SampleCallback callback) { impl_->start(std::move(callback)); }
 
