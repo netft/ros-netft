@@ -286,11 +286,6 @@ void Client::Impl::stop() noexcept {
   }
 }
 
-bool Client::Impl::called_from_worker_thread() const noexcept {
-  std::scoped_lock lifecycle_lock(lifecycle_mutex_);
-  return worker_.joinable() && worker_.get_id() == std::this_thread::get_id();
-}
-
 void Client::Impl::bias() {
   std::scoped_lock command_lock(command_mutex_);
   std::scoped_lock record_lock(record_mutex_);

@@ -15,15 +15,6 @@ template <typename Value> class DeferredDestroyer {
 public:
   DeferredDestroyer() : worker_(&DeferredDestroyer::run, this) {}
 
-  ~DeferredDestroyer() {
-    {
-      std::scoped_lock lock(mutex_);
-      stopping_ = true;
-    }
-    condition_.notify_one();
-    worker_.join();
-  }
-
   void enqueue(std::unique_ptr<Value> value) {
     {
       std::scoped_lock lock(mutex_);
@@ -38,10 +29,7 @@ private:
       std::unique_ptr<Value> value;
       {
         std::unique_lock<std::mutex> lock(mutex_);
-        condition_.wait(lock, [&] { return stopping_ || !pending_.empty(); });
-        if (pending_.empty()) {
-          return;
-        }
+        condition_.wait(lock, [&] { return !pending_.empty(); });
         value = std::move(pending_.front());
         pending_.pop_front();
       }
@@ -52,9 +40,15 @@ private:
   std::mutex mutex_;
   std::condition_variable condition_;
   std::deque<std::unique_ptr<Value>> pending_;
-  bool stopping_{};
   std::thread worker_;
 };
+
+template <typename Value> DeferredDestroyer<Value> &deferred_destroyer() {
+  // Callbacks can outlive static teardown. Keeping this worker alive for the
+  // process lifetime avoids both destruction-order races and lost enqueues.
+  static auto *instance = new DeferredDestroyer<Value>;
+  return *instance;
+}
 
 } // namespace
 
@@ -63,8 +57,7 @@ Client::Client(Config config) : impl_(std::make_unique<Impl>(std::move(config)))
 Client::~Client() {
   if (impl_ && impl_->called_from_worker_thread()) {
     impl_->stop();
-    static DeferredDestroyer<Impl> deferred;
-    deferred.enqueue(std::move(impl_));
+    deferred_destroyer<Impl>().enqueue(std::move(impl_));
     return;
   }
   stop();

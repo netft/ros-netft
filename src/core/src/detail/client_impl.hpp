@@ -24,7 +24,11 @@ public:
 
   void start(SampleCallback callback);
   void stop() noexcept;
-  [[nodiscard]] bool called_from_worker_thread() const noexcept;
+  [[nodiscard]] bool called_from_worker_thread() const noexcept {
+    std::scoped_lock lifecycle_lock(lifecycle_mutex_);
+    return !worker_exited_.load(std::memory_order_acquire) &&
+           active_worker_id_ == std::this_thread::get_id();
+  }
   void bias();
   bool wait_for_first_sample(std::chrono::duration<double> timeout);
   bool faulted() const noexcept;
