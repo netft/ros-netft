@@ -14,7 +14,6 @@ body:
     attributes:
       label: Driver revision
       description: Provide a release tag or the output of `git rev-parse --short HEAD`.
-      placeholder: v0.1.0 or abcdef0
     validations:
       required: true
 
