@@ -4,6 +4,9 @@ Changelog for package netft_driver
 
 Forthcoming
 -----------
+
+0.3.3 (2026-08-14)
+------------------
 * Update the private ``netft-cpp`` core snapshot to v0.3.3, including
   lifecycle-safe client destruction during concurrent worker shutdown.
 
