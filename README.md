@@ -133,3 +133,45 @@ issues through [SECURITY.md](SECURITY.md).
 The repository is licensed under [Apache-2.0](LICENSE). The private
 `netft-cpp` snapshot retains its upstream license at
 [src/core/LICENSE](src/core/LICENSE).
+
+## Candidate runtime contracts
+
+The unpublished candidate adds `allow_bias` for both standalone nodes and the
+ros2_control hardware parameters. It defaults to true to preserve existing
+service availability; set it to false for a read-only deployment. A disabled
+adapter does not create the bias service. ROS 2 standalone example:
+
+```sh
+ros2 run netft_driver netft_node --ros-args -p allow_bias:=false
+```
+
+For ros2_control use `<param name="allow_bias">false</param>` in the hardware
+block, or `allow_bias="false"` on the supplied xacro macro. ROS 1 uses the private
+`~allow_bias` parameter. Restart/reconfigure for parameter changes; the toggle
+is not a dynamic authorization mechanism. Bias is a device command, and callers
+must own permission to alter the measurement reference.
+
+`docs/bias-policy.example.xml` illustrates separate SROS2 driver, reader and
+operator identities: readers cannot request bias, operators can. Customize node,
+namespace, topic and service names and add the actual discovery/parameter/lifecycle
+permissions needed by your deployment before generating signed DDS permissions.
+The example is a policy fragment for adaptation, not an installed keystore or a
+verified security deployment. Enforce signed permissions with
+`ROS_SECURITY_ENABLE=true`, `ROS_SECURITY_STRATEGY=Enforce` and your provisioned
+`ROS_SECURITY_KEYSTORE`; test denied and allowed calls against a loopback sensor.
+See the [official access-control policy design](https://design.ros2.org/articles/ros2_access_control_policies.html)
+and [SROS2 sample policy](https://github.com/ros2/sros2/blob/rolling/sros2/test/policies/sample.policy.xml).
+ROS 1 deployments must isolate the master, nodes and device network and disable
+bias for readers; a ROS_DOMAIN_ID or service name alone does not authorize users.
+
+Wrench header stamps are ROS publication time. `received_at`, SDK age and control
+freshness use the host steady clock, so a paused or jumping simulated ROS clock
+does not make stale force data fresh. Diagnostics use wall timers; ros2_control
+read ignores its ROS-time argument for freshness. Callback SI overflow is
+rejected, and auxiliary executor failure latches a control fault and invalidates
+state interfaces. The candidate compiled in a disposable Kilted environment; standalone and controller tests, including SI overflow, disabled bias and executor failure, passed. Other distributions and DDS policy enforcement remain release acceptance checks.
+
+The existing CI contract classifies Jazzy and Lyrical as primary, Humble as
+compatibility, Kilted as active short-lived, Rolling as development, and Noetic as
+legacy/EOL source-only. A configured matrix is not evidence that every candidate
+passed it; keep per-distribution results with the release.

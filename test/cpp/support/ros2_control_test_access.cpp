@@ -112,4 +112,9 @@ int test_auxiliary_thread_count() noexcept
     "netft_ros2_control_test_auxiliary_thread_count")();
 }
 
+void test_throw_executor_spin_once() noexcept
+{
+  resolve<void (*)() noexcept>("netft_ros2_control_test_throw_executor_spin_once")();
+}
+
 }  // namespace netft_driver::ros2_control_test_access

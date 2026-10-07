@@ -1,3 +1,4 @@
+#include "detail/time.hpp"
 #include "detail/udp_transport.hpp"
 
 #ifndef NOMINMAX
@@ -145,8 +146,9 @@ std::size_t UdpTransport::receive(std::uint8_t *data, const std::size_t capacity
   if (wait_started_hook != nullptr) {
     wait_started_hook(wait_started_context);
   }
-  const auto bounded_timeout = std::max(timeout, std::chrono::duration<double>::zero());
-  const auto deadline = std::chrono::steady_clock::now() + bounded_timeout;
+  static_cast<void>(checked_duration(timeout));
+  const auto bounded_timeout = timeout;
+  const auto deadline = checked_deadline(std::chrono::steady_clock::now(), bounded_timeout);
   constexpr int kShutdownCheckIntervalMilliseconds = 50;
   constexpr auto kShutdownCheckInterval =
       std::chrono::milliseconds{kShutdownCheckIntervalMilliseconds};

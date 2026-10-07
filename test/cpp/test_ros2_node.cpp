@@ -63,3 +63,16 @@ TEST(NetFTRos2Node, DeclaresAndMapsEveryAdapterParameterWithManualCalibration)
   node.reset();
   rclcpp::shutdown();
 }
+
+
+TEST(NetFTRos2Node, DisabledBiasDoesNotAdvertiseAService)
+{
+  rclcpp::init(0, nullptr);
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter{"allow_bias", false}});
+  auto node = std::make_shared<NetFTRos2Node>(options);
+  const auto services = node->get_service_names_and_types();
+  EXPECT_EQ(services.count("/netft/bias"), 0U);
+  node.reset();
+  rclcpp::shutdown();
+}

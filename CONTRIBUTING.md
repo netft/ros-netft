@@ -99,10 +99,10 @@ revision.
 
 ### Current core candidate
 
-The private snapshot uses unpublished upstream commit `8aec517a8d4baed66089e0e9d0928c90f8ebfadb`; `UPSTREAM` marks it `unreleased`. It is not the published v0.3.3 snapshot. Update from a clean upstream checkout using:
+The private snapshot uses unpublished upstream commit `91f012c5d6f9b63902765ccbec3437cb286c15e1`; `UPSTREAM` marks it `unreleased`. It is not the published v0.3.3 snapshot. Update from a clean upstream checkout using:
 
 ```sh
-python tools/sync_core.py sync --source /path/to/netft-cpp --commit 8aec517a8d4baed66089e0e9d0928c90f8ebfadb
+python tools/sync_core.py sync --source /path/to/netft-cpp --commit 91f012c5d6f9b63902765ccbec3437cb286c15e1
 python tools/sync_core.py verify
 ```
 

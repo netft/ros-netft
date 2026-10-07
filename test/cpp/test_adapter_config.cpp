@@ -137,3 +137,15 @@ TEST(AdapterConfig, ValidatesManualCountsOnlyWhenSensorCalibrationIsDisabled)
 }
 
 }  // namespace
+
+
+TEST(AdapterConfig, MapsBiasPermissionAndRejectsUnrepresentableDiagnosticPeriods)
+{
+  netft_driver::AdapterParameters parameters;
+  parameters.allow_bias = false;
+  EXPECT_FALSE(netft_driver::map_adapter_parameters(parameters).allow_bias);
+  for (const auto rate : {1e-300, 1e300}) {
+    parameters.diagnostics_rate = rate;
+    EXPECT_THROW(netft_driver::map_adapter_parameters(parameters), std::invalid_argument);
+  }
+}

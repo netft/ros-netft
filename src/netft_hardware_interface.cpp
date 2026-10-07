@@ -77,6 +77,7 @@ std::atomic<bool> g_test_return_initial_sample{false};
 std::atomic<int> g_test_failed_write_axis{-1};
 std::atomic<bool> g_test_throw_executor_cancel{false};
 std::atomic<int> g_test_auxiliary_threads{0};
+std::atomic<bool> g_test_throw_executor_spin{false};
 const SiSample kInitialSample{};
 #endif
 
@@ -456,14 +457,17 @@ private:
     diagnostics_rate_ = parse_double(parameters, "diagnostics_rate", 1.0);
     expected_rdt_rate_ = parse_double(parameters, "expected_rdt_rate", 2000.0);
     rate_tolerance_ = parse_double(parameters, "rate_tolerance", 0.2);
+    allow_bias_ = parse_bool(parameters, "allow_bias", true);
     const auto bias_service = parameters.find("bias_service");
     ros_name_token_ = collision_safe_name_token(sensor_name_);
     bias_service_name_ = bias_service == parameters.end() ?
       "/" + ros_name_token_ + "/bias" : bias_service->second;
-    if (activation_timeout_.count() <= 0.0) {
+    if (activation_timeout_.count() <= 0.0 ||
+        1.0e9L * activation_timeout_.count() >= static_cast<long double>(std::numeric_limits<std::int64_t>::max())) {
       throw std::invalid_argument{"activation_timeout must be greater than zero"};
     }
-    if (diagnostics_rate_ <= 0.0) {
+    if (diagnostics_rate_ <= 0.0 || 1.0e9L / diagnostics_rate_ < 1 ||
+        1.0e9L / diagnostics_rate_ >= static_cast<long double>(std::numeric_limits<std::int64_t>::max())) {
       throw std::invalid_argument{"diagnostics_rate must be greater than zero"};
     }
     if (expected_rdt_rate_ <= 0.0) {
@@ -491,7 +495,7 @@ private:
       auxiliary_node_name(ros_name_token_), options);
     diagnostics_publisher_ = auxiliary_node_->create_publisher<
       diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", rclcpp::QoS{10}.reliable());
-    bias_service_ = auxiliary_node_->create_service<std_srvs::srv::Trigger>(
+    if (allow_bias_) bias_service_ = auxiliary_node_->create_service<std_srvs::srv::Trigger>(
       bias_service_name_,
       [this](const std::shared_ptr<std_srvs::srv::Trigger::Request>,
         std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
@@ -517,9 +521,23 @@ private:
 #endif
       try {
         while (!auxiliary_stopping_.load(std::memory_order_acquire)) {
-          auxiliary_executor_->spin_some(std::chrono::milliseconds{20});
+#ifdef NETFT_ROS2_CONTROL_TESTING
+          if (g_test_throw_executor_spin.exchange(false, std::memory_order_acq_rel)) {
+            throw std::runtime_error{"injected executor spin failure"};
+          }
+#endif
+          auxiliary_executor_->spin_once(std::chrono::milliseconds{20});
         }
-      } catch (const std::exception &) {
+      } catch (const std::exception & error) {
+        if (!auxiliary_stopping_.load(std::memory_order_acquire)) {
+          latch_fatal_fault(netft::FaultCode::Callback);
+          RCLCPP_ERROR(auxiliary_node_->get_logger(), "auxiliary executor failed: %s", error.what());
+        }
+      } catch (...) {
+        if (!auxiliary_stopping_.load(std::memory_order_acquire)) {
+          latch_fatal_fault(netft::FaultCode::Callback);
+          RCLCPP_ERROR(auxiliary_node_->get_logger(), "auxiliary executor failed with an unknown exception");
+        }
       }
 #ifdef NETFT_ROS2_CONTROL_TESTING
       g_test_auxiliary_threads.fetch_sub(1, std::memory_order_acq_rel);
@@ -661,6 +679,7 @@ private:
   double rate_tolerance_{0.2};
   std::string sensor_name_;
   std::string ros_name_token_;
+  bool allow_bias_{true};
   std::string bias_service_name_;
   std::unique_ptr<netft::Client> client_;
   std::unique_ptr<DiagnosticEvaluator> evaluator_;
@@ -869,6 +888,12 @@ extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT int
 netft_ros2_control_test_auxiliary_thread_count() noexcept
 {
   return netft_driver::ros2_control_test_access::detail::auxiliary_thread_count();
+}
+
+extern "C" NETFT_ROS2_CONTROL_TEST_EXPORT void
+netft_ros2_control_test_throw_executor_spin_once() noexcept
+{
+  netft_driver::g_test_throw_executor_spin.store(true, std::memory_order_release);
 }
 
 #undef NETFT_ROS2_CONTROL_TEST_EXPORT

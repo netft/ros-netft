@@ -1,3 +1,4 @@
+#include "detail/time.hpp"
 #include "detail/udp_transport.hpp"
 
 #include <netdb.h>
@@ -106,7 +107,7 @@ std::size_t UdpTransport::receive(std::uint8_t *data, const std::size_t capacity
   }
 
   pollfd descriptor{socket, POLLIN, 0};
-  const auto deadline = std::chrono::steady_clock::now() + timeout;
+  const auto deadline = checked_deadline(std::chrono::steady_clock::now(), timeout);
   auto remaining = timeout;
   int poll_result{};
   if (wait_started_hook != nullptr) {
