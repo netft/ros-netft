@@ -1,8 +1,35 @@
 #include "ros/unit_conversion.hpp"
 
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace netft_driver {
+
+namespace {
+double checked_scale(double value, double scale)
+{
+  if (!std::isfinite(value) ||
+      (scale > 1.0 && std::abs(value) > std::numeric_limits<double>::max() / scale)) {
+    throw std::invalid_argument{"measurement cannot be represented in SI units"};
+  }
+  const auto result = value * scale;
+  if (!std::isfinite(result)) {
+    throw std::invalid_argument{"measurement cannot be represented in SI units"};
+  }
+  return result;
+}
+}  // namespace
+
+bool sample_is_finite(const SiSample & sample) noexcept
+{
+  for (std::size_t index = 0; index < sample.force.size(); ++index) {
+    if (!std::isfinite(sample.force[index]) || !std::isfinite(sample.torque[index])) {
+      return false;
+    }
+  }
+  return true;
+}
 
 double force_scale_to_newtons(netft::ForceUnit unit)
 {
@@ -59,8 +86,8 @@ SiSample to_si_sample(const netft::Sample & sample)
   si.received_at = sample.received_at;
 
   for (std::size_t index = 0; index < si.force.size(); ++index) {
-    si.force[index] = sample.force[index] * force_scale;
-    si.torque[index] = sample.torque[index] * torque_scale;
+    si.force[index] = checked_scale(sample.force[index], force_scale);
+    si.torque[index] = checked_scale(sample.torque[index], torque_scale);
   }
 
   return si;

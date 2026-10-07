@@ -4,6 +4,8 @@ Changelog for package netft_driver
 
 Forthcoming
 -----------
+* Reject non-finite or overflowing SI measurements before publication and invalidate
+  ros2_control interfaces with a sensor-configuration fault for invalid numeric data.
 
 0.3.3 (2026-08-14)
 ------------------

@@ -1,8 +1,31 @@
 #include "ros/unit_conversion.hpp"
 
 #include <gtest/gtest.h>
+#include <limits>
 
 namespace {
+
+TEST(UnitConversion, RejectsNonFiniteOrOverflowingAxes)
+{
+  for (const auto value : {std::numeric_limits<double>::infinity(),
+                           std::numeric_limits<double>::quiet_NaN(),
+                           std::numeric_limits<double>::max(),
+                           -std::numeric_limits<double>::max()}) {
+    netft::Sample sample;
+    sample.force_unit = netft::ForceUnit::KiloNewton;
+    sample.torque_unit = netft::TorqueUnit::KiloNewtonMeter;
+    sample.force[2] = value;
+    EXPECT_THROW(netft_driver::to_si_sample(sample), std::invalid_argument);
+    sample.force[2] = 0.0;
+    sample.torque[1] = value;
+    EXPECT_THROW(netft_driver::to_si_sample(sample), std::invalid_argument);
+  }
+  netft_driver::SiSample invalid;
+  invalid.force[1] = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_FALSE(netft_driver::sample_is_finite(invalid));
+  invalid.force[1] = 0.0;
+  EXPECT_TRUE(netft_driver::sample_is_finite(invalid));
+}
 
 TEST(UnitConversion, ConvertsEveryForceUnitToNewtons)
 {

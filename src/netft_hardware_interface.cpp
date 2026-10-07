@@ -270,7 +270,12 @@ public:
     invalidate_interfaces();
     try {
       client_->start([this](const netft::Sample & sample) {
-        sample_buffer_.writeFromNonRT(to_si_sample(sample));
+        try {
+          sample_buffer_.writeFromNonRT(to_si_sample(sample));
+        } catch (const std::invalid_argument &) {
+          latch_fatal_fault(netft::FaultCode::SensorConfiguration);
+          throw;
+        }
         sample_generation_.fetch_add(1, std::memory_order_release);
       });
     } catch (const std::exception &) {
@@ -333,6 +338,11 @@ public:
 #endif
     if (fault_latched() || interface_write_fault_.load(std::memory_order_acquire) ||
         sample == nullptr) {
+      invalidate_interfaces();
+      return hardware_interface::return_type::ERROR;
+    }
+    if (!sample_is_finite(*sample)) {
+      latch_fatal_fault(netft::FaultCode::SensorConfiguration);
       invalidate_interfaces();
       return hardware_interface::return_type::ERROR;
     }

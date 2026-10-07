@@ -15,6 +15,7 @@ pytest = ">=8,<9"
 pytest-timeout = ">=2,<3"
 
 [tasks]
+snapshot-check = "python tools/sync_core.py verify"
 unit = "python -m pytest -m 'not hardware'"
 ros1-harness = "bash test/integration/ros1_smoke_harness_test.sh"
 ros2-harness = "bash test/integration/ros2_smoke_harness_test.sh"

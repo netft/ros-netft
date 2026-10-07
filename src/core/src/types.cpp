@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace netft {
@@ -26,11 +27,23 @@ void require_port(std::string_view name, int value) {
   }
 }
 
+void require_safe_count(std::string_view name, double value) {
+  require_positive_finite(name, value);
+  // INT32_MIN has the largest magnitude. Round the minimum divisor up so
+  // every raw count remains representable, including under directed rounding.
+  constexpr double magnitude = -static_cast<double>(std::numeric_limits<std::int32_t>::min());
+  constexpr double minimum = (magnitude / std::numeric_limits<double>::max()) *
+                             (1.0 + std::numeric_limits<double>::epsilon());
+  if (value < minimum) {
+    throw std::invalid_argument(std::string{name} + " cannot represent the full raw count range");
+  }
+}
+
 } // namespace
 
 void validate(const Calibration &calibration) {
-  require_positive_finite("counts_per_force_unit", calibration.counts_per_force_unit);
-  require_positive_finite("counts_per_torque_unit", calibration.counts_per_torque_unit);
+  require_safe_count("counts_per_force_unit", calibration.counts_per_force_unit);
+  require_safe_count("counts_per_torque_unit", calibration.counts_per_torque_unit);
   if (calibration.force_unit == ForceUnit::Unknown ||
       calibration.torque_unit == TorqueUnit::Unknown) {
     throw std::invalid_argument("calibration units must be known");

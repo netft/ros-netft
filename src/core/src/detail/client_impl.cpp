@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <exception>
 #include <stdexcept>
 #include <utility>
@@ -631,6 +632,11 @@ Client::Impl::handle_record(const detail::RawRecord &record,
   sample.torque = {record.tx / calibration.counts_per_torque_unit,
                    record.ty / calibration.counts_per_torque_unit,
                    record.tz / calibration.counts_per_torque_unit};
+  const auto finite = [](double value) { return std::isfinite(value); };
+  if (!std::all_of(sample.force.begin(), sample.force.end(), finite) ||
+      !std::all_of(sample.torque.begin(), sample.torque.end(), finite)) {
+    return SessionResult::SensorConfiguration;
+  }
   sample.force_unit = calibration.force_unit;
   sample.torque_unit = calibration.torque_unit;
   sample.configuration_revision = configuration.revision;

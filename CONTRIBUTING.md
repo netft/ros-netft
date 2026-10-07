@@ -96,3 +96,14 @@ Contributions are licensed under the repository's
 upstream license copy at [src/core/LICENSE](src/core/LICENSE). Propose reusable
 core fixes upstream first, then copy them from a released immutable upstream
 revision.
+
+### Current core candidate
+
+The private snapshot uses unpublished upstream commit `8aec517a8d4baed66089e0e9d0928c90f8ebfadb`; `UPSTREAM` marks it `unreleased`. It is not the published v0.3.3 snapshot. Update from a clean upstream checkout using:
+
+```sh
+python tools/sync_core.py sync --source /path/to/netft-cpp --commit 8aec517a8d4baed66089e0e9d0928c90f8ebfadb
+python tools/sync_core.py verify
+```
+
+The manifest checks the selected bytes, including provenance. It detects drift and does not authenticate a remote release. Consumer build files remain private; fixes to core source belong upstream.
