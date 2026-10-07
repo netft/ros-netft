@@ -72,6 +72,9 @@ jobs:
           if [[ "${ROS_VERSION}" == "2" ]]; then
             apt-get install -y python3-colcon-common-extensions
           fi
+          if [[ "${ROS_DISTRO}" == "jazzy" ]]; then
+            apt-get install -y ros-jazzy-sros2 ros-jazzy-rmw-fastrtps-cpp
+          fi
       - name: Run ROS-neutral C++ tests
         shell: bash
         run: |
@@ -95,7 +98,11 @@ jobs:
           if [[ "${ROS_VERSION}" == "1" ]]; then
             bash test/integration/ros1_smoke.sh
           else
-            bash test/integration/ros2_smoke.sh
+            if [[ "${ROS_DISTRO}" == "jazzy" ]]; then
+              NETFT_RUN_SROS2_SMOKE=1 bash test/integration/ros2_smoke.sh
+            else
+              bash test/integration/ros2_smoke.sh
+            fi
             if [[ "${ROS_DISTRO}" == "jazzy" ]]; then
               bash test/integration/ros2_control_isolation_test.sh
             else

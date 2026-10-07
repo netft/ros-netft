@@ -153,12 +153,18 @@ must own permission to alter the measurement reference.
 
 `docs/bias-policy.example.xml` illustrates separate SROS2 driver, reader and
 operator identities: readers cannot request bias, operators can. Customize node,
-namespace, topic and service names and add the actual discovery/parameter/lifecycle
-permissions needed by your deployment before generating signed DDS permissions.
-The example is a policy fragment for adaptation, not an installed keystore or a
-verified security deployment. Enforce signed permissions with
+namespace, topic and service names and add lifecycle permissions if needed.
+The example includes logging, parameter-event publication and each node's own
+parameter-service replies; it does not grant clients parameter-service requests.
+It is a policy for adaptation, not an installed keystore. Enforce signed permissions with
 `ROS_SECURITY_ENABLE=true`, `ROS_SECURITY_STRATEGY=Enforce` and your provisioned
 `ROS_SECURITY_KEYSTORE`; test denied and allowed calls against a loopback sensor.
+The bounded `test/integration/ros2_sros2_smoke.py --node-executable <installed-node>`
+checks secure sample delivery, a denied reader bias endpoint and an allowed
+operator call, including the fake device's command count. Run it in an isolated
+container/CI host with SROS2 and Fast DDS installed; it creates temporary keys for
+the selected `ROS_DOMAIN_ID` and deletes them on exit. Jazzy CI runs it once with
+the graph smoke's installed node and leased domain, without an extra build.
 See the [official access-control policy design](https://design.ros2.org/articles/ros2_access_control_policies.html)
 and [SROS2 sample policy](https://github.com/ros2/sros2/blob/rolling/sros2/test/policies/sample.policy.xml).
 ROS 1 deployments must isolate the master, nodes and device network and disable
