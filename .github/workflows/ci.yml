@@ -7,6 +7,12 @@ on:
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
+    inputs:
+      distro:
+        description: ROS distribution to validate; choose all for release acceptance
+        type: choice
+        default: all
+        options: [all, noetic, humble, jazzy, kilted, lyrical, rolling]
 
 permissions:
   contents: read
@@ -17,43 +23,19 @@ concurrency:
 
 jobs:
   native-ros:
-    name: ROS ${{ matrix.distro }} (${{ matrix.policy }})
+    name: ROS ${{ matrix.distro }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - distro: noetic
-            image: ros:noetic-ros-base
-            ros_version: 1
-            policy: legacy-eol-source-only
-          - distro: humble
-            image: ros:humble-ros-base
-            ros_version: 2
-            policy: compatibility
-          - distro: jazzy
-            image: ros:jazzy-ros-base
-            ros_version: 2
-            policy: primary
-          - distro: kilted
-            image: ros:kilted-ros-base
-            ros_version: 2
-            policy: active-short-lived
-          - distro: lyrical
-            image: ros:lyrical-ros-base
-            ros_version: 2
-            policy: primary
-          - distro: rolling
-            image: ros:rolling-ros-base
-            ros_version: 2
-            policy: development
+        distro: ${{ fromJSON(inputs.distro && inputs.distro != 'all' && format('["{0}"]', inputs.distro) || '["noetic", "humble", "jazzy", "kilted", "lyrical", "rolling"]') }}
     container:
-      image: ${{ matrix.image }}
+      image: ros:${{ matrix.distro }}-ros-base
     env:
       DEBIAN_FRONTEND: noninteractive
       ROS_DISTRO: ${{ matrix.distro }}
-      ROS_VERSION: ${{ matrix.ros_version }}
+      ROS_VERSION: ${{ matrix.distro == 'noetic' && '1' || '2' }}
     steps:
       - name: Install checkout dependency
         run: apt-get update && apt-get install -y git

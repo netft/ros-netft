@@ -154,7 +154,7 @@ must own permission to alter the measurement reference.
 `docs/bias-policy.example.xml` illustrates separate SROS2 driver, reader and
 operator identities: readers cannot request bias, operators can. Customize node,
 namespace, topic and service names and add lifecycle permissions if needed.
-The example includes logging, parameter-event publication and each node's own
+The example includes logging, parameter-event publication/subscription and each node's own
 parameter-service replies; it does not grant clients parameter-service requests.
 It is a policy for adaptation, not an installed keystore. Enforce signed permissions with
 `ROS_SECURITY_ENABLE=true`, `ROS_SECURITY_STRATEGY=Enforce` and your provisioned

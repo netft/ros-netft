@@ -8,14 +8,20 @@
             <topic>netft/wrench</topic>
             <topic>diagnostics</topic>
           </topics>
-          <services reply="ALLOW">
+          <topics subscribe="ALLOW">
+          <topic>parameter_events</topic>
+        </topics>
+        <services reply="ALLOW">
             <service>netft/bias</service>
           </services>
           <topics publish="ALLOW">
             <topic>rosout</topic>
             <topic>parameter_events</topic>
           </topics>
-          <services reply="ALLOW">
+          <topics subscribe="ALLOW">
+          <topic>parameter_events</topic>
+        </topics>
+        <services reply="ALLOW">
             <service>~/describe_parameters</service>
             <service>~/get_parameter_types</service>
             <service>~/get_parameters</service>
@@ -41,7 +47,10 @@
             <topic>rosout</topic>
             <topic>parameter_events</topic>
           </topics>
-          <services reply="ALLOW">
+          <topics subscribe="ALLOW">
+          <topic>parameter_events</topic>
+        </topics>
+        <services reply="ALLOW">
             <service>~/describe_parameters</service>
             <service>~/get_parameter_types</service>
             <service>~/get_parameters</service>
@@ -63,7 +72,10 @@
             <topic>rosout</topic>
             <topic>parameter_events</topic>
           </topics>
-          <services reply="ALLOW">
+          <topics subscribe="ALLOW">
+          <topic>parameter_events</topic>
+        </topics>
+        <services reply="ALLOW">
             <service>~/describe_parameters</service>
             <service>~/get_parameter_types</service>
             <service>~/get_parameters</service>
