@@ -207,6 +207,11 @@ RequiredFields extract_required_fields(std::string_view xml) {
     throw DiscoveryError("sensor configuration contains malformed element nesting");
   }
   for (std::size_t index = 0; index < kRequiredTags.size(); ++index) {
+    // Older Net F/T firmware (e.g. digver 2.2.x) omits <prodname> from netftapi2.xml.
+    if (!seen[index] && kRequiredTags[index] == "prodname") {
+      fields[index] = "ATI Net F/T";
+      continue;
+    }
     if (!seen[index]) {
       throw DiscoveryError("sensor configuration field '" + std::string{kRequiredTags[index]} +
                            "' must appear exactly once");
