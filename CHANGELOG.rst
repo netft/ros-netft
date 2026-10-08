@@ -5,6 +5,9 @@ Changelog for package netft_driver
 Forthcoming
 -----------
 
+0.4.0 (2026-10-08)
+------------------
+
 * Add ``allow_bias`` to standalone and control adapters; false omits the bias service. The default remains true for compatibility.
 * Use wall-clock diagnostics, bound diagnostic periods, and report auxiliary executor failure as a latched control fault. Executor idle waiting replaces busy spinning.
 * Reject non-finite or overflowing SI measurements before publication and invalidate

@@ -15,7 +15,8 @@ import tempfile
 from pathlib import Path
 
 REPOSITORY = "https://github.com/netft/netft-cpp.git"
-COMMIT = "91f012c5d6f9b63902765ccbec3437cb286c15e1"
+COMMIT = "1ce68a08a9387d9a36d22c3c259e44533199c347"
+TAG = "v0.3.4"
 SELECTED = ('LICENSE', 'include/netft', 'src')
 ROOT = Path(__file__).resolve().parents[1] / "src/core"
 
@@ -46,7 +47,7 @@ def manifest(root: Path) -> str:
 def verify(root: Path = ROOT) -> None:
     metadata = dict(line.split("=", 1) for line in (root / "UPSTREAM").read_text().splitlines())
     if (metadata.get("repository") != REPOSITORY or metadata.get("commit") != COMMIT
-            or metadata.get("tag") != "unreleased" or metadata.get("paths") != ",".join(SELECTED)):
+            or metadata.get("tag") != TAG or metadata.get("paths") != ",".join(SELECTED)):
         raise SystemExit("snapshot identity mismatch")
     if (root / "SNAPSHOT.sha256").read_text() != manifest(root):
         raise SystemExit("snapshot checksum mismatch")
@@ -57,6 +58,8 @@ def sync(source: Path, root: Path = ROOT, commit: str = COMMIT) -> None:
         raise SystemExit("unsupported upstream commit")
     if git(source, "remote", "get-url", "origin") != REPOSITORY:
         raise SystemExit("source repository mismatch")
+    if git(source, "rev-parse", f"{TAG}^{{commit}}") != commit:
+        raise SystemExit("source tag does not match the required commit")
     if git(source, "rev-parse", "HEAD") != commit or git(source, "status", "--porcelain"):
         raise SystemExit("source must be clean at the requested commit")
     # Stage first, preserving the consumer's private build file. Swap only after
@@ -84,7 +87,7 @@ def sync(source: Path, root: Path = ROOT, commit: str = COMMIT) -> None:
             else:
                 shutil.copy2(origin, target)
         (staging / "UPSTREAM").write_text(
-            f"repository={REPOSITORY}\ntag=unreleased\ncommit={commit}\nlicense=Apache-2.0\npaths={','.join(SELECTED)}\nadaptations=none\n"
+            f"repository={REPOSITORY}\ntag={TAG}\ncommit={commit}\nlicense=Apache-2.0\npaths={','.join(SELECTED)}\nadaptations=none\n"
         )
         (staging / "SNAPSHOT.sha256").write_text(manifest(staging))
         verify(staging)

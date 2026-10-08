@@ -136,7 +136,7 @@ The repository is licensed under [Apache-2.0](LICENSE). The private
 
 ## Candidate runtime contracts
 
-The unpublished candidate adds `allow_bias` for both standalone nodes and the
+Version 0.4.0 adds `allow_bias` for both standalone nodes and the
 ros2_control hardware parameters. It defaults to true to preserve existing
 service availability; set it to false for a read-only deployment. A disabled
 adapter does not create the bias service. ROS 2 standalone example:
