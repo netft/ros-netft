@@ -479,6 +479,12 @@ main() {
   reaped_status=0
   run_full_graph_scenario "$temp_root/full" "$full_domain"
 
+  if [[ "${NETFT_RUN_SROS2_SMOKE:-0}" == "1" ]]; then
+    ROS_DOMAIN_ID="$full_domain" timeout --kill-after=3s 55s python3 \
+      "$repo_root/test/integration/ros2_sros2_smoke.py" \
+      --node-executable "$temp_root/ws/install/netft_driver/lib/netft_driver/netft_node"
+  fi
+
   reaped_pid=""
   reaped_status=0
   run_shutdown_scenario "$temp_root/shutdown" "$shutdown_domain"

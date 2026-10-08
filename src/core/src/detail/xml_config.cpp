@@ -278,6 +278,11 @@ SensorConfiguration parse_sensor_configuration(std::string_view xml) {
   configuration.calibration.counts_per_torque_unit = parse_positive_count(fields[2], "cfgcpt");
   configuration.calibration.force_unit = parse_force_unit(fields[3]);
   configuration.calibration.torque_unit = parse_torque_unit(fields[4]);
+  try {
+    validate(configuration.calibration);
+  } catch (const std::invalid_argument &error) {
+    throw DiscoveryError(error.what());
+  }
   configuration.source = CalibrationSource::Sensor;
   configuration.revision = 1;
   return configuration;

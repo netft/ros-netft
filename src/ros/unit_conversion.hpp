@@ -21,5 +21,6 @@ struct SiSample {
 double force_scale_to_newtons(netft::ForceUnit unit);
 double torque_scale_to_newton_metres(netft::TorqueUnit unit);
 SiSample to_si_sample(const netft::Sample & sample);
+bool sample_is_finite(const SiSample & sample) noexcept;
 
 }  // namespace netft_driver

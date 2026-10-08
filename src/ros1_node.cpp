@@ -28,7 +28,7 @@ public:
   {
     wrench_publisher_ = public_node_.advertise<geometry_msgs::WrenchStamped>(wrench_topic_, 10);
     diagnostics_publisher_ = public_node_.advertise<diagnostic_msgs::DiagnosticArray>("/diagnostics", 10);
-    bias_service_ = public_node_.advertiseService(bias_service_name_, &NetFTRos1Node::handle_bias, this);
+    if (allow_bias_) bias_service_ = public_node_.advertiseService(bias_service_name_, &NetFTRos1Node::handle_bias, this);
     diagnostic_timer_ = public_node_.createTimer(ros::Duration{1.0 / diagnostics_rate_}, &NetFTRos1Node::publish_diagnostics, this);
   }
 
@@ -52,6 +52,7 @@ private:
     parameter(private_node_, "frame_id", parameters.frame_id, parameters.frame_id);
     parameter(private_node_, "wrench_topic", parameters.wrench_topic, parameters.wrench_topic);
     parameter(private_node_, "bias_service", parameters.bias_service, parameters.bias_service);
+    parameter(private_node_, "allow_bias", parameters.allow_bias, parameters.allow_bias);
     parameter(private_node_, "use_sensor_calibration", parameters.use_sensor_calibration,
               parameters.use_sensor_calibration);
     parameter(private_node_, "counts_per_force", parameters.counts_per_force, parameters.counts_per_force);
@@ -75,6 +76,7 @@ private:
     frame_id_ = mapped.frame_id;
     wrench_topic_ = mapped.wrench_topic;
     bias_service_name_ = mapped.bias_service;
+    allow_bias_ = mapped.allow_bias;
     diagnostics_rate_ = mapped.diagnostics_rate;
     expected_rdt_rate_ = mapped.expected_rdt_rate;
     rate_tolerance_ = mapped.rate_tolerance;
@@ -122,6 +124,7 @@ private:
 
   ros::NodeHandle public_node_, private_node_;
   netft::Config config_;
+  bool allow_bias_{true};
   std::string frame_id_, wrench_topic_, bias_service_name_;
   double diagnostics_rate_{1.0}, expected_rdt_rate_{2000.0}, rate_tolerance_{0.2};
   netft::Client client_;

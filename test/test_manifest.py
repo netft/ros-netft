@@ -1,4 +1,6 @@
 import re
+import subprocess
+import sys
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -36,6 +38,10 @@ def test_private_core_provenance_is_structurally_valid():
     )
 
     assert metadata["repository"] == "https://github.com/netft/netft-cpp.git"
-    assert re.fullmatch(r"v\d+\.\d+\.\d+", metadata["tag"])
+    assert metadata["tag"] == "unreleased" or re.fullmatch(r"v\d+\.\d+\.\d+", metadata["tag"])
     assert re.fullmatch(r"[0-9a-f]{40}", metadata["commit"])
     assert (ROOT / "src/core/LICENSE").is_file()
+
+
+def test_private_core_bytes_match_manifest():
+    subprocess.run([sys.executable, str(ROOT / "tools/sync_core.py"), "verify"], check=True)

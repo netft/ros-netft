@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -16,6 +17,7 @@ struct AdapterParameters {
   std::string frame_id{"netft_link"};
   std::string wrench_topic{"/netft/wrench"};
   std::string bias_service{"/netft/bias"};
+  bool allow_bias{true};
   bool use_sensor_calibration{true};
   double counts_per_force{1000000.0};
   double counts_per_torque{1000000.0};
@@ -36,6 +38,7 @@ struct AdapterConfig {
   std::string frame_id;
   std::string wrench_topic;
   std::string bias_service;
+  bool allow_bias{true};
   double diagnostics_rate{};
   double expected_rdt_rate{};
   double rate_tolerance{};
@@ -52,7 +55,9 @@ inline void validate_adapter_config(const std::string & frame_id, const std::str
   non_empty("frame_id", frame_id);
   non_empty("wrench_topic", wrench_topic);
   non_empty("bias_service", bias_service);
-  if (!std::isfinite(diagnostics_rate) || diagnostics_rate <= 0.0) {
+  if (!std::isfinite(diagnostics_rate) || diagnostics_rate <= 0.0 ||
+      1.0e9L / diagnostics_rate < 1 ||
+      1.0e9L / diagnostics_rate >= static_cast<long double>(std::numeric_limits<std::int64_t>::max())) {
     throw std::invalid_argument{"diagnostics_rate must be finite and greater than zero"};
   }
 }
@@ -85,6 +90,7 @@ inline AdapterConfig map_adapter_parameters(const AdapterParameters & parameters
   mapped.frame_id = parameters.frame_id;
   mapped.wrench_topic = parameters.wrench_topic;
   mapped.bias_service = parameters.bias_service;
+  mapped.allow_bias = parameters.allow_bias;
   mapped.diagnostics_rate = parameters.diagnostics_rate;
   mapped.expected_rdt_rate = parameters.expected_rdt_rate;
   mapped.rate_tolerance = parameters.rate_tolerance;

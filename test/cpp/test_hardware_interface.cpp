@@ -1016,4 +1016,42 @@ TEST(NetFTHardwareInterface, TwoInstancesHaveIsolatedServicesDiagnosticsAndFault
 }
 
 }  // namespace
+
+TEST(NetFTHardwareInterface, SiOverflowLatchesConfigurationFaultAndInvalidatesAxes)
+{
+  FakeSensor sensor{500};
+  sensor.set_xml_configuration(
+    "<netft><prodname>Test Axia</prodname><cfgcpf>1e-298</cfgcpf><cfgcpt>1</cfgcpt>"
+    "<scfgfu>kN</scfgfu><scfgtu>Nm</scfgtu></netft>");
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port(),
+    "<param name=\"http_port\">" + std::to_string(sensor.http_port()) + "</param>"
+    "<param name=\"use_sensor_calibration\">true</param>"));
+  configure_and_activate(*manager);
+  auto axes = claim_axes(*manager);
+  ASSERT_TRUE(read_ok(*manager));
+  sensor.pause();
+  sensor.send_record_now(1000000, 0, 1000000,
+    {std::numeric_limits<std::int32_t>::max(), 0, 0, 0, 0, 0});
+  ASSERT_TRUE(eventually([] {
+    return ros2_control_test_access::test_active_latched_fault_code() == FaultCode::SensorConfiguration;
+  }));
+  EXPECT_FALSE(ros2_control_test_access::test_read_active_instance());
+  for (const auto & axis : axes) EXPECT_TRUE(std::isnan(axis_value(axis)));
+}
+
+TEST(NetFTHardwareInterface, AuxiliaryExecutorFailureIsVisibleAndInvalidatesAxes)
+{
+  FakeSensor sensor{500};
+  auto manager = make_manager(urdf(sensor.host(), sensor.rdt_port()));
+  configure_and_activate(*manager);
+  auto axes = claim_axes(*manager);
+  ASSERT_TRUE(read_ok(*manager));
+  ros2_control_test_access::test_throw_executor_spin_once();
+  ASSERT_TRUE(eventually([] {
+    return ros2_control_test_access::test_active_latched_fault_code() == FaultCode::Callback;
+  }));
+  EXPECT_FALSE(ros2_control_test_access::test_read_active_instance());
+  for (const auto & axis : axes) EXPECT_TRUE(std::isnan(axis_value(axis)));
+}
+
 }  // namespace netft_driver

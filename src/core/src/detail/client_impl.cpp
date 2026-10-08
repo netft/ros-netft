@@ -1,7 +1,9 @@
 #include "detail/client_impl.hpp"
+#include "detail/time.hpp"
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <exception>
 #include <stdexcept>
 #include <utility>
@@ -301,12 +303,13 @@ void Client::Impl::bias() {
 }
 
 bool Client::Impl::wait_for_first_sample(const std::chrono::duration<double> timeout) {
+  const auto deadline = detail::checked_deadline(std::chrono::steady_clock::now(), timeout);
   std::unique_lock<std::mutex> data_lock(data_mutex_);
   const auto captured_generation = generation_;
   if (captured_generation == 0) {
     return false;
   }
-  first_sample_cv_.wait_for(data_lock, timeout, [this, captured_generation] {
+  first_sample_cv_.wait_until(data_lock, deadline, [this, captured_generation] {
     return generation_ != captured_generation || delivered_generation_ == captured_generation ||
            stopping_ || faulted();
   });
@@ -406,7 +409,9 @@ void Client::Impl::run() noexcept {
       }
 
       std::unique_lock<std::mutex> data_lock(data_mutex_);
-      first_sample_cv_.wait_for(data_lock, backoff, [this] { return stopping_.load(); });
+      first_sample_cv_.wait_until(data_lock,
+                                  detail::checked_deadline(detail::SteadyClock::now(), backoff),
+                                  [this] { return stopping_.load(); });
       data_lock.unlock();
       backoff = std::min(backoff * 2.0, config_.reconnect_max_delay);
     }
@@ -461,7 +466,7 @@ Client::Impl::SessionOutcome Client::Impl::receive_session() {
   }
 
   const auto timeout = config_.receive_timeout;
-  auto deadline = std::chrono::steady_clock::now() + timeout;
+  auto deadline = detail::checked_deadline(std::chrono::steady_clock::now(), timeout);
   std::array<std::uint8_t, 65'536> buffer{};
   while (!stopping_) {
     const auto now = std::chrono::steady_clock::now();
@@ -511,7 +516,7 @@ Client::Impl::SessionOutcome Client::Impl::receive_session() {
       consecutive_malformed_ = 0;
     }
     received_valid_record = true;
-    deadline = received_at + timeout;
+    deadline = detail::checked_deadline(received_at, timeout);
     if (const auto outcome = handle_record(record, received_at)) {
       return {*outcome, {}, received_valid_record};
     }
@@ -631,6 +636,11 @@ Client::Impl::handle_record(const detail::RawRecord &record,
   sample.torque = {record.tx / calibration.counts_per_torque_unit,
                    record.ty / calibration.counts_per_torque_unit,
                    record.tz / calibration.counts_per_torque_unit};
+  const auto finite = [](double value) { return std::isfinite(value); };
+  if (!std::all_of(sample.force.begin(), sample.force.end(), finite) ||
+      !std::all_of(sample.torque.begin(), sample.torque.end(), finite)) {
+    return SessionResult::SensorConfiguration;
+  }
   sample.force_unit = calibration.force_unit;
   sample.torque_unit = calibration.torque_unit;
   sample.configuration_revision = configuration.revision;

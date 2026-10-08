@@ -31,6 +31,7 @@ FaultCode test_active_latched_fault_code() noexcept;
 ActivityCounters test_active_activity_counters() noexcept;
 bool test_interface_write_fault_latched() noexcept;
 void test_throw_executor_cancel_once() noexcept;
+void test_throw_executor_spin_once() noexcept;
 int test_auxiliary_thread_count() noexcept;
 
 }  // namespace netft_driver::ros2_control_test_access

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policy version="0.2.0">
+  <enclaves>
+    <enclave path="/netft/driver">
+      <profiles>
+        <profile ns="/" node="netft">
+          <topics publish="ALLOW">
+            <topic>netft/wrench</topic>
+            <topic>diagnostics</topic>
+          </topics>
+          <topics subscribe="ALLOW">
+          <topic>parameter_events</topic>
+        </topics>
+        <services reply="ALLOW">
+            <service>netft/bias</service>
+          </services>
+          <topics publish="ALLOW">
+            <topic>rosout</topic>
+            <topic>parameter_events</topic>
+          </topics>
+          <topics subscribe="ALLOW">
+          <topic>parameter_events</topic>
+        </topics>
+        <services reply="ALLOW">
+            <service>~/describe_parameters</service>
+            <service>~/get_parameter_types</service>
+            <service>~/get_parameters</service>
+            <service>~/list_parameters</service>
+            <service>~/set_parameters</service>
+            <service>~/set_parameters_atomically</service>
+            <service>~/get_type_description</service>
+          </services>
+        </profile>
+      </profiles>
+    </enclave>
+    <enclave path="/netft/reader">
+      <profiles>
+        <profile ns="/" node="netft_reader">
+          <topics subscribe="ALLOW">
+            <topic>netft/wrench</topic>
+            <topic>diagnostics</topic>
+          </topics>
+          <services request="DENY">
+            <service>netft/bias</service>
+          </services>
+          <topics publish="ALLOW">
+            <topic>rosout</topic>
+            <topic>parameter_events</topic>
+          </topics>
+          <topics subscribe="ALLOW">
+          <topic>parameter_events</topic>
+        </topics>
+        <services reply="ALLOW">
+            <service>~/describe_parameters</service>
+            <service>~/get_parameter_types</service>
+            <service>~/get_parameters</service>
+            <service>~/list_parameters</service>
+            <service>~/set_parameters</service>
+            <service>~/set_parameters_atomically</service>
+            <service>~/get_type_description</service>
+          </services>
+        </profile>
+      </profiles>
+    </enclave>
+    <enclave path="/netft/operator">
+      <profiles>
+        <profile ns="/" node="netft_operator">
+          <services request="ALLOW">
+            <service>netft/bias</service>
+          </services>
+          <topics publish="ALLOW">
+            <topic>rosout</topic>
+            <topic>parameter_events</topic>
+          </topics>
+          <topics subscribe="ALLOW">
+          <topic>parameter_events</topic>
+        </topics>
+        <services reply="ALLOW">
+            <service>~/describe_parameters</service>
+            <service>~/get_parameter_types</service>
+            <service>~/get_parameters</service>
+            <service>~/list_parameters</service>
+            <service>~/set_parameters</service>
+            <service>~/set_parameters_atomically</service>
+            <service>~/get_type_description</service>
+          </services>
+        </profile>
+      </profiles>
+    </enclave>
+  </enclaves>
+</policy>

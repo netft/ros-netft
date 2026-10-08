@@ -23,8 +23,8 @@ public:
   {
     wrench_publisher_ = create_publisher<geometry_msgs::msg::WrenchStamped>(wrench_topic_, rclcpp::SensorDataQoS{});
     diagnostics_publisher_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", rclcpp::QoS{10}.reliable());
-    bias_service_ = create_service<std_srvs::srv::Trigger>(bias_service_name_, [this](const std::shared_ptr<std_srvs::srv::Trigger::Request>, std::shared_ptr<std_srvs::srv::Trigger::Response> response) { handle_bias(*response); });
-    diagnostic_timer_ = rclcpp::create_timer(this, get_clock(), std::chrono::duration<double>{1.0 / diagnostics_rate_}, [this] { publish_diagnostics(); });
+    if (allow_bias_) bias_service_ = create_service<std_srvs::srv::Trigger>(bias_service_name_, [this](const std::shared_ptr<std_srvs::srv::Trigger::Request>, std::shared_ptr<std_srvs::srv::Trigger::Response> response) { handle_bias(*response); });
+    diagnostic_timer_ = create_wall_timer( std::chrono::duration<double>{1.0 / diagnostics_rate_}, [this] { publish_diagnostics(); });
   }
 
   void start() { client_.start([this](const netft::Sample & sample) { publish_wrench(sample); }); }
@@ -53,6 +53,7 @@ private:
     parameters.frame_id = parameter<std::string>("frame_id", parameters.frame_id);
     parameters.wrench_topic = parameter<std::string>("wrench_topic", parameters.wrench_topic);
     parameters.bias_service = parameter<std::string>("bias_service", parameters.bias_service);
+    parameters.allow_bias = parameter<bool>("allow_bias", parameters.allow_bias);
     parameters.use_sensor_calibration =
       parameter<bool>("use_sensor_calibration", parameters.use_sensor_calibration);
     parameters.counts_per_force = parameter<double>("counts_per_force", parameters.counts_per_force);
@@ -75,6 +76,7 @@ private:
     frame_id_ = mapped.frame_id;
     wrench_topic_ = mapped.wrench_topic;
     bias_service_name_ = mapped.bias_service;
+    allow_bias_ = mapped.allow_bias;
     diagnostics_rate_ = mapped.diagnostics_rate;
     expected_rdt_rate_ = mapped.expected_rdt_rate;
     rate_tolerance_ = mapped.rate_tolerance;
@@ -120,6 +122,7 @@ private:
   }
 
   netft::Config config_;
+  bool allow_bias_{true};
   std::string frame_id_, wrench_topic_, bias_service_name_;
   double diagnostics_rate_{1.0}, expected_rdt_rate_{2000.0}, rate_tolerance_{0.2};
   netft::Client client_;
