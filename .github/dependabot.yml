@@ -1,3 +1,4 @@
+# Disable routine version-update PRs without changing security update or alert settings.
 version: 2
 
 updates:
@@ -10,4 +11,4 @@ updates:
       timezone: Asia/Shanghai
     labels:
       - dependencies
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
