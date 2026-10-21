@@ -175,9 +175,10 @@ freshness use the host steady clock, so a paused or jumping simulated ROS clock
 does not make stale force data fresh. Diagnostics use wall timers; ros2_control
 read ignores its ROS-time argument for freshness. Callback SI overflow is
 rejected, and auxiliary executor failure latches a control fault and invalidates
-state interfaces. Release 0.4.0 passed the standalone and controller checks for
-Noetic, Humble, Jazzy, Kilted, Lyrical and Rolling. The checks include SI overflow,
-disabled bias and executor failure. SROS2 Enforce-mode acceptance on Jazzy and
+state interfaces. Release 0.4.0 passed the standalone checks on Noetic, Humble,
+Jazzy, Kilted, Lyrical and Rolling, and ros2_control checks on the supported ROS 2
+distributions. Focused controller checks also cover SI overflow, disabled bias and
+executor failure. SROS2 Enforce-mode acceptance on Jazzy and
 Kilted verified sample delivery, denial of reader bias requests and one allowed
 operator bias command against a loopback sensor. These results cover the tested
 policies and middleware; validate any adapted deployment policy separately.
