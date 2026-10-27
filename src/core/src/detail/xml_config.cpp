@@ -208,6 +208,11 @@ RequiredFields extract_required_fields(std::string_view xml) {
   }
   for (std::size_t index = 0; index < kRequiredTags.size(); ++index) {
     if (!seen[index]) {
+      // Legacy firmware may omit the display name; calibration fields remain mandatory.
+      if (index == 0) {
+        fields[index] = "ATI Net F/T";
+        continue;
+      }
       throw DiscoveryError("sensor configuration field '" + std::string{kRequiredTags[index]} +
                            "' must appear exactly once");
     }

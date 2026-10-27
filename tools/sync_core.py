@@ -15,8 +15,8 @@ import tempfile
 from pathlib import Path
 
 REPOSITORY = "https://github.com/netft/netft-cpp.git"
-COMMIT = "1ce68a08a9387d9a36d22c3c259e44533199c347"
-TAG = "v0.3.4"
+COMMIT = "d2ea470267d9fb5dc4d1ee53b9ce268a831c60dc"
+TAG = "v0.3.5"
 SELECTED = ('LICENSE', 'include/netft', 'src')
 ROOT = Path(__file__).resolve().parents[1] / "src/core"
 

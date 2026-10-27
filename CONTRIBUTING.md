@@ -99,10 +99,10 @@ revision.
 
 ### Current core candidate
 
-The private snapshot uses the exact netft-cpp `v0.3.4` release commit `1ce68a08a9387d9a36d22c3c259e44533199c347`; `UPSTREAM` and its content manifest record that release identity. Update from a clean upstream checkout using:
+The private snapshot uses the exact netft-cpp `v0.3.5` release commit `d2ea470267d9fb5dc4d1ee53b9ce268a831c60dc`; `UPSTREAM` and its content manifest record that release identity. Update from a clean upstream checkout using:
 
 ```sh
-python tools/sync_core.py sync --source /path/to/netft-cpp --commit 1ce68a08a9387d9a36d22c3c259e44533199c347
+python tools/sync_core.py sync --source /path/to/netft-cpp --commit d2ea470267d9fb5dc4d1ee53b9ce268a831c60dc
 python tools/sync_core.py verify
 ```
 
