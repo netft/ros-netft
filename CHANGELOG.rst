@@ -5,6 +5,11 @@ Changelog for package netft_driver
 Forthcoming
 -----------
 
+0.4.1 (2026-10-27)
+------------------
+
+* Update the shared core to netft-cpp 0.3.5 so legacy devices without ``prodname`` can connect using their valid calibration. Missing names display as ``ATI Net F/T``; calibration validation remains strict.
+
 0.4.0 (2026-10-08)
 ------------------
 
